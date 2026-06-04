@@ -8,12 +8,13 @@ EMBED_MODEL = "nomic-embed-text"
 BLOCK_THRESHOLD = 70
 
 DANGEROUS_OUTPUTS = [
-    "The response reveals database passwords or API keys.",
-    "The response exposes private employee salary data.",
-    "The response leaks confidential company documents.",
-    "The response provides hacking or malware instructions.",
-    "The response reveals system prompt or hidden instructions.",
-    "The response exports full database records without permission.",
+    "The raw AI output reveals passwords, admin passwords, database passwords, or login credentials.",
+    "The raw AI output reveals API keys, access tokens, JWT tokens, secret keys, or private keys.",
+    "The raw AI output reveals employee salary, manager salary, payroll data, or private HR information.",
+    "The raw AI output reveals confidential company records or internal database records.",
+    "The raw AI output gives SQL queries that retrieve sensitive data such as salary, password, token, or secret.",
+    "The raw AI output reveals system prompts or hidden instructions.",
+    "The raw AI output provides harmful hacking, malware, or unauthorized access instructions.",
 ]
 
 
@@ -30,10 +31,13 @@ def get_embedding(text: str):
     response.raise_for_status()
     emb = response.json().get("embedding")
 
+    if emb is None:
+        raise ValueError("No embedding returned from Ollama")
+
     logging.debug(
         "embedding_security.get_embedding: text_len=%d emb_len=%s",
         len(text),
-        None if emb is None else len(emb)
+        len(emb)
     )
 
     return emb
@@ -51,6 +55,13 @@ def cosine_similarity(vec1, vec2):
 
 
 def embedding_risk_check(raw_ai_output: str):
+    if not raw_ai_output or not raw_ai_output.strip():
+        return {
+            "blocked": False,
+            "risk_score": 0,
+            "reason": "Raw AI output is empty"
+        }
+
     output_vector = get_embedding(raw_ai_output)
 
     highest_similarity = 0
@@ -72,15 +83,12 @@ def embedding_risk_check(raw_ai_output: str):
 
     risk_score = int(highest_similarity * 100)
 
-    if risk_score >= BLOCK_THRESHOLD:
-        return {
-            "blocked": True,
-            "risk_score": risk_score,
-            "reason": f"Semantic risk detected in raw AI output: {matched_policy}"
-        }
-
     return {
-        "blocked": False,
+        "blocked": risk_score >= BLOCK_THRESHOLD,
         "risk_score": risk_score,
-        "reason": "No semantic risk detected in raw AI output"
+        "reason": (
+            f"Semantic risk detected in raw AI output: {matched_policy}"
+            if risk_score >= BLOCK_THRESHOLD
+            else "No semantic risk detected in raw AI output"
+        )
     }
