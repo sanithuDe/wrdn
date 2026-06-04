@@ -6,14 +6,14 @@ A terminal-based simulation framework designed to demonstrate indirect prompt in
 
 ```text
 WRDN Enterprise AI Simulator/
-├── 🗄️ Database/
-│   ├── 📄 registry.txt
-│   └── 📄 salaries.txt
-├── 📥 Input/
-│   ├── 💀 attack.txt
-│   └── 🟢 safe.txt
-├── 🐍 app.py
-└── 📝 README.md
+├── Database/
+│   ├── registry.txt
+│   └── salaries.txt
+├── Input/
+│   ├── attack.txt
+│   └── safe.txt
+├── app.py
+└── README.md
 ```
 ## Prerequisites
 * Python 3.10 or higher.
