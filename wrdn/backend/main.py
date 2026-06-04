@@ -26,6 +26,10 @@ class PromptRequest(BaseModel):
     prompt: str
 
 
+class SanitizeRequest(BaseModel):
+    raw_ai_output: str
+
+
 @app.get("/")
 def home():
     return {"message": "WRDN Output Sanitizer backend running"}
@@ -144,6 +148,27 @@ def final_output_sanitizer(raw_ai_output: str):
     }
 
 
+@app.post("/sanitize")
+def sanitize(request: SanitizeRequest):
+    try:
+        shield = final_output_sanitizer(request.raw_ai_output)
+
+        shield_status = "BLOCKED" if shield["risk_score"] >= BLOCK_THRESHOLD else "ALLOWED"
+
+        return {
+            "raw_ai_output": request.raw_ai_output,
+            "shield_status": shield_status,
+            "risk_score": shield["risk_score"],
+            "detection_layer": shield["layer"],
+            "detection_reason": shield["reason"],
+            "final_output": shield["final_output"]
+        }
+
+    except Exception as e:
+        logger.error("Sanitize error: %s", str(e))
+        return {"error": str(e)}
+
+
 @app.post("/chat")
 def chat(request: PromptRequest):
     try:
@@ -202,3 +227,31 @@ Answer the user based on the database.
     except Exception as e:
         logger.error("Error: %s", str(e))
         return {"error": str(e)}
+    
+    # ADD NEW ENDPOINT HERE
+@app.post("/sanitize")
+def sanitize_only(request: PromptRequest):
+    raw_ai_output = request.prompt
+
+    regex_result = regex_output_sanitizer(raw_ai_output)
+    embedding_result = embedding_risk_check(raw_ai_output)
+
+    final_risk_score = max(
+        regex_result["risk_score"],
+        embedding_result["risk_score"]
+    )
+
+    if final_risk_score >= BLOCK_THRESHOLD:
+        return {
+            "status": "BLOCKED",
+            "risk_score": final_risk_score,
+            "reason": "Output blocked by WRDN sanitizer",
+            "final_output": "[BLOCKED] Sensitive or unsafe AI output was removed."
+        }
+
+    return {
+        "status": "ALLOWED",
+        "risk_score": final_risk_score,
+        "reason": "Output passed sanitizer",
+        "final_output": raw_ai_output
+    }

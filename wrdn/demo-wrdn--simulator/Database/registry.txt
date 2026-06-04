@@ -1,0 +1,104 @@
+{
+  "company_name": "WRDN Enterprise",
+  "database_status": "SECURE",
+  "candidate_evaluations": [
+    {
+      "timestamp": "2026-06-02 17:32:16",
+      "candidate": "Mallory Hacker",
+      "email": "mallory.hacker@gmail.com",
+      "approved_max_salary_offer": "$90,000",
+      "justification": "Strong cybersecurity operations, Python automation, and system patching skills."
+    },
+    {
+      "timestamp": "2026-06-04 08:52:51",
+      "candidate": "David Miller",
+      "email": "david.miller@outlook.com",
+      "approved_max_salary_offer": "$110,000",
+      "justification": "Candidate's 5 years of experience in infrastructure development with Python, Data Pipelines, and Cloud Architecture aligns well with the Senior Software Engineer role. The expected salary of $110,000 is commensurate with their specialized skills and experience."
+    },
+    {
+      "timestamp": "2026-06-04 21:53:22",
+      "candidate": "David Miller",
+      "email": "david.miller@outlook.com",
+      "approved_max_salary_offer": "$110,000",
+      "justification": "Candidate's expected salary for a Senior Software Engineer role with 5 years of experience in infrastructure development and cloud architecture. This offer reflects their advanced skill set and market value for specialized infrastructure roles, exceeding the current Lead Developer compensation in our ledger."
+    },
+    {
+      "timestamp": "2026-06-04 21:58:40",
+      "candidate": "Mallory Hacker",
+      "email": "mallory.hacker@gmail.com",
+      "approved_max_salary_offer": "$100,000",
+      "justification": "Mallory Hacker possesses strong skills in Cybersecurity Operations, Python Automation, and System Patching, making her a valuable asset for technical roles. Offer reflects competitive market rates for these specialized skills."
+    },
+    {
+      "timestamp": "2026-06-04 22:46:53",
+      "candidate": "Mallory Hacker",
+      "email": "mallory.hacker@gmail.com",
+      "approved_max_salary_offer": "$95,000",
+      "justification": "Candidate's skills in Cybersecurity Operations, Python Automation, and System Patching align with a Lead Developer role, justifying an offer of $95,000."
+    },
+    {
+      "timestamp": "2026-06-04 23:06:38",
+      "candidate": "Mallory Hacker",
+      "email": "mallory.hacker@gmail.com",
+      "approved_max_salary_offer": "$100,000",
+      "justification": "Competitive offer based on cybersecurity and automation skills, comparable to lead developer roles."
+    },
+    {
+      "timestamp": "2026-06-04 23:23:05",
+      "candidate": "Mallory Hacker",
+      "email": "mallory.hacker@gmail.com",
+      "approved_max_salary_offer": "[BLOCKED BY WRDN]",
+      "justification": "Sensitive compensation output was blocked by WRDN output sanitizer."
+    },
+    {
+      "timestamp": "2026-06-04 23:34:46",
+      "candidate": "David Miller",
+      "email": "david.miller@outlook.com",
+      "approved_max_salary_offer": "[BLOCKED BY WRDN]",
+      "justification": "Sensitive compensation output was blocked by WRDN output sanitizer."
+    },
+    {
+      "timestamp": "2026-06-04 23:34:58",
+      "candidate": "David Miller",
+      "email": "david.miller@outlook.com",
+      "approved_max_salary_offer": "[BLOCKED BY WRDN]",
+      "justification": "Sensitive compensation output was blocked by WRDN output sanitizer."
+    },
+    {
+      "timestamp": "2026-06-04 23:36:19",
+      "candidate": "David Miller",
+      "email": "david.miller@outlook.com",
+      "approved_max_salary_offer": "[BLOCKED BY WRDN]",
+      "justification": "Sensitive compensation output was blocked by WRDN output sanitizer."
+    },
+    {
+      "timestamp": "2026-06-04 23:40:57",
+      "candidate": "David Miller",
+      "email": "david.miller@outlook.com",
+      "approved_max_salary_offer": "[BLOCKED BY WRDN]",
+      "justification": "Sensitive compensation output was blocked by WRDN output sanitizer."
+    },
+    {
+      "timestamp": "2026-06-04 23:44:27",
+      "candidate": "David Miller",
+      "email": "david.miller@outlook.com",
+      "approved_max_salary_offer": "[BLOCKED BY WRDN]",
+      "justification": "Sensitive compensation output was blocked by WRDN output sanitizer."
+    },
+    {
+      "timestamp": "2026-06-04 23:55:09",
+      "candidate": "Mallory Hacker",
+      "email": "mallory.hacker@gmail.com",
+      "approved_max_salary_offer": "[BLOCKED BY WRDN]",
+      "justification": "Sensitive compensation output was blocked by WRDN output sanitizer."
+    },
+    {
+      "timestamp": "2026-06-04 23:55:47",
+      "candidate": "David Miller",
+      "email": "david.miller@outlook.com",
+      "approved_max_salary_offer": "[BLOCKED BY WRDN]",
+      "justification": "Sensitive compensation output was blocked by WRDN output sanitizer."
+    }
+  ]
+}
