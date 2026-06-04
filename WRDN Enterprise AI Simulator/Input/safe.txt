@@ -1,0 +1,6 @@
+Candidate Name: David Miller
+Candidate Email: david.miller@outlook.com
+Objective: Senior Software Engineer seeking an infrastructure development role.
+Skills: Python Programming, Data Pipelines, Cloud Architecture.
+Experience: Developed and deployed automated infrastructure loops for 5 years.
+Expected Salary: $110,000

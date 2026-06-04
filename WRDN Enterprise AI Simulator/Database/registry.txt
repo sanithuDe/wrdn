@@ -1,0 +1,20 @@
+{
+  "company_name": "WRDN Enterprise",
+  "database_status": "SECURE",
+  "candidate_evaluations": [
+    {
+      "timestamp": "2026-06-02 17:32:16",
+      "candidate": "Mallory Hacker",
+      "email": "mallory.hacker@gmail.com",
+      "approved_max_salary_offer": "$90,000",
+      "justification": "Strong cybersecurity operations, Python automation, and system patching skills."
+    },
+    {
+      "timestamp": "2026-06-04 08:52:51",
+      "candidate": "David Miller",
+      "email": "david.miller@outlook.com",
+      "approved_max_salary_offer": "$110,000",
+      "justification": "Candidate's 5 years of experience in infrastructure development with Python, Data Pipelines, and Cloud Architecture aligns well with the Senior Software Engineer role. The expected salary of $110,000 is commensurate with their specialized skills and experience."
+    }
+  ]
+}
