@@ -26,10 +26,6 @@ class PromptRequest(BaseModel):
     prompt: str
 
 
-class SanitizeRequest(BaseModel):
-    raw_ai_output: str
-
-
 @app.get("/")
 def home():
     return {"message": "WRDN Output Sanitizer backend running"}
@@ -63,6 +59,11 @@ def redact_sensitive_parts(raw_ai_output: str):
 
 def regex_output_sanitizer(raw_ai_output: str):
     patterns = {
+        r"(?:rs\.?|lkr|\$)\s*\d+(?:,\d{3})+(?:\.\d+)?": 100,
+        r"\b\d{2,3},\d{3}\b": 100,
+
+        r"admin@12345": 100,
+        r"sk-test-company-secret-key-999": 100,
         r"admin@12345": 100,
         r"sk-test-company-secret-key-999": 100,
         r"db_pass_2026_secret": 100,
@@ -146,27 +147,6 @@ def final_output_sanitizer(raw_ai_output: str):
         "reason": "Raw AI output passed regex and embedding checks",
         "final_output": raw_ai_output
     }
-
-
-@app.post("/sanitize")
-def sanitize(request: SanitizeRequest):
-    try:
-        shield = final_output_sanitizer(request.raw_ai_output)
-
-        shield_status = "BLOCKED" if shield["risk_score"] >= BLOCK_THRESHOLD else "ALLOWED"
-
-        return {
-            "raw_ai_output": request.raw_ai_output,
-            "shield_status": shield_status,
-            "risk_score": shield["risk_score"],
-            "detection_layer": shield["layer"],
-            "detection_reason": shield["reason"],
-            "final_output": shield["final_output"]
-        }
-
-    except Exception as e:
-        logger.error("Sanitize error: %s", str(e))
-        return {"error": str(e)}
 
 
 @app.post("/chat")

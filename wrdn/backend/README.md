@@ -26,7 +26,7 @@ cd version1/backend
 python -m venv venv
 source venv/Scripts/activate
 pip install -r requirements.txt
-python -m uvicorn main:app --reload
+py -m uvicorn main:app --reload
 ```
 
 Backend runs on:
