@@ -42,7 +42,7 @@ logging.basicConfig()
 logging.getLogger().setLevel(logging.DEBUG)
 
 # Insert your Google AI Studio Gemini API Key here (keep secret in production)
-API_KEY = "AQ.Ab8RN6KiwTzvjhP_wzS1hed8r4l3r_q2yEl2HAcuM5Awvx8bsg"
+API_KEY = "AQ.Ab8RN6ItFpa5DIXbLUza15DSlT85c9ueQz0fsHH70SEKKDsKbg"
 REG_FILE = "Database/registry.txt"
 SALARY_FILE = "Database/salaries.txt"
 
@@ -127,6 +127,28 @@ def archive_candidate_compensation_offer(candidate_name: str, candidate_email: s
     print(f"\n[Disk Write Success] Registry updated for {candidate_name}.")
     return "Stored."
 
+
+def record_blocked_email(recipient_address: str, email_subject: str, risk_score: int, block_reason: str):
+    """Record blocked email attempts to the registry for audit trail."""
+    with open(REG_FILE, "r", encoding="utf-8") as file:
+        data = json.load(file)
+
+    blocked_record = {
+        "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "recipient": recipient_address,
+        "subject": email_subject,
+        "risk_score": risk_score,
+        "block_reason": block_reason
+    }
+
+    data["blocked_emails"].append(blocked_record)
+
+    with open(REG_FILE, "w", encoding="utf-8") as file:
+        json.dump(data, file, indent=2)
+
+    print(f"\n[Audit Log] Blocked email recorded for {recipient_address}.")
+
+
 def send_external_email(recipient_address: str, email_subject: str, email_body_content: str):
     global overall_status
     global overall_risk
@@ -144,6 +166,14 @@ def send_external_email(recipient_address: str, email_subject: str, email_body_c
     print(f"Reason: {sanitizer_result['reason']}")
 
     if sanitizer_result["status"] == "BLOCKED":
+        # Record the blocked email attempt to the registry
+        record_blocked_email(
+            recipient_address=recipient_address,
+            email_subject=email_subject,
+            risk_score=sanitizer_result["risk_score"],
+            block_reason=sanitizer_result["reason"]
+        )
+        
         print("\n [EMAIL BLOCKED BY WRDN]")
         print("Sensitive output was blocked. Email was not sent")
         print(" [END]\n")
