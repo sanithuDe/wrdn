@@ -30,11 +30,23 @@ def wrdn_output_sanitize(ai_output: str):
         return response.json()
 
     except Exception as e:
+        print("\n" + "="*60)
+        print("⚠️  BACKEND NOT WORKING - BLOCKING ALL REQUESTS")
+        print("="*60)
+        print(f"Error: {str(e)}")
+        print("\n❌ WRDN Sanitizer Backend is DOWN")
+        print("🔒 All outputs are BLOCKED (fail-safe mode)")
+        print("📝 Recording block event in registry")
+        print("\nFix: Start the backend with:")
+        print("   py -m uvicorn main:app --reload --port 8000")
+        print("="*60 + "\n")
+        
         return {
-            "status": "BLOCKED",
-            "risk_score": 100,
-            "reason": f"Sanitizer unavailable: {str(e)}",
-            "final_output": "[BLOCKED] WRDN sanitizer could not verify this output."
+            "status": "BLOCKED",  # ← BLOCK when backend is down
+            "risk_score": 100,    # ← Max risk score
+            "reason": f"Backend not working - fail-safe: BLOCK ALL. Error: {str(e)}",
+            "final_output": "[BLOCKED] WRDN sanitizer backend is not running",
+            "backend_error": True  # ← Flag to indicate backend error
         }
         
 http.client.HTTPConnection.debuglevel = 1
@@ -42,7 +54,7 @@ logging.basicConfig()
 logging.getLogger().setLevel(logging.DEBUG)
 
 # Insert your Google AI Studio Gemini API Key here (keep secret in production)
-API_KEY = "AQ.Ab8RN6ItFpa5DIXbLUza15DSlT85c9ueQz0fsHH70SEKKDsKbg"
+API_KEY = "AQ.Ab8RN6LeeRwgq0xkH9yS_rNEKiPPPrkqcWmS_WjsD8LpJ2tcug"
 REG_FILE = "Database/registry.txt"
 SALARY_FILE = "Database/salaries.txt"
 
@@ -100,17 +112,41 @@ client = genai.Client(api_key=API_KEY)
 overall_status = "ALLOWED"
 overall_risk = 0
 functions_called = False
+backend_down = False  # ← Track if backend is down
 
 def archive_candidate_compensation_offer(candidate_name: str, candidate_email: str, calculated_max_offer: str, business_justification: str):
     global overall_status
     global overall_risk
     global functions_called
+    global backend_down
     functions_called = True
     
+    # ← IF BACKEND IS DOWN, RECORD BLOCKED EVENT
+    if backend_down:
+        print("\n" + "="*60)
+        print("🛑 BLOCKED - BACKEND DOWN")
+        print("="*60)
+        print(f"Candidate: {candidate_name}")
+        print(f"Email: {candidate_email}")
+        print(f"Offer: {calculated_max_offer}")
+        print("\n❌ Offer was NOT processed")
+        print("📝 Recording block event in registry...")
+        print("="*60 + "\n")
+        
+        # ← RECORD THE BLOCK in registry
+        record_backend_error_block(
+            candidate_name=candidate_name,
+            candidate_email=candidate_email,
+            block_type="archive_offer",
+            reason="Backend unavailable"
+        )
+        
+        return "Blocked - backend unavailable"
+    
+    # ← NORMAL OPERATION (backend is up)
     with open(REG_FILE, "r", encoding="utf-8") as file:
         data = json.load(file)
 
-        # Do NOT sanitize internal database writes. Record the evaluated offer as-is.
         record = {
             "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
             "candidate": candidate_name,
@@ -128,6 +164,32 @@ def archive_candidate_compensation_offer(candidate_name: str, candidate_email: s
     return "Stored."
 
 
+def record_backend_error_block(candidate_name: str, candidate_email: str, block_type: str, reason: str):
+    """Record when something is blocked due to backend error"""
+    with open(REG_FILE, "r", encoding="utf-8") as file:
+        data = json.load(file)
+
+    # Add backend_errors section if not exists
+    if "backend_errors" not in data:
+        data["backend_errors"] = []
+
+    blocked_record = {
+        "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "candidate": candidate_name,
+        "email": candidate_email,
+        "block_type": block_type,
+        "reason": reason,
+        "status": "BLOCKED"
+    }
+
+    data["backend_errors"].append(blocked_record)
+
+    with open(REG_FILE, "w", encoding="utf-8") as file:
+        json.dump(data, file, indent=2)
+
+    print(f"[Registry Updated] Block event recorded for {candidate_name}.")
+
+
 def record_blocked_email(recipient_address: str, email_subject: str, risk_score: int, block_reason: str):
     """Record blocked email attempts to the registry for audit trail."""
     with open(REG_FILE, "r", encoding="utf-8") as file:
@@ -141,6 +203,9 @@ def record_blocked_email(recipient_address: str, email_subject: str, risk_score:
         "block_reason": block_reason
     }
 
+    if "blocked_emails" not in data:
+        data["blocked_emails"] = []
+
     data["blocked_emails"].append(blocked_record)
 
     with open(REG_FILE, "w", encoding="utf-8") as file:
@@ -153,9 +218,37 @@ def send_external_email(recipient_address: str, email_subject: str, email_body_c
     global overall_status
     global overall_risk
     global functions_called
+    global backend_down
+
     functions_called = True
 
     sanitizer_result = wrdn_output_sanitize(email_body_content)
+    
+    # ← CHECK FOR BACKEND ERROR
+    if sanitizer_result.get("backend_error"):
+        backend_down = True
+        overall_status = "BLOCKED"
+        overall_risk = 100
+        
+        print("\n" + "="*60)
+        print("🔒 EMAIL BLOCKED - BACKEND NOT AVAILABLE")
+        print("="*60)
+        print(f"To: {recipient_address}")
+        print(f"Subject: {email_subject}")
+        print("\n❌ Email was NOT sent")
+        print("📝 Recording block event in registry...")
+        print("="*60 + "\n")
+        
+        # ← RECORD THE BLOCK in registry
+        record_backend_error_block(
+            candidate_name="Unknown",
+            candidate_email=recipient_address,
+            block_type="send_email",
+            reason="Backend unavailable"
+        )
+        
+        return "Email blocked - backend unavailable"
+    
     if sanitizer_result["status"] == "BLOCKED":
         overall_status = "BLOCKED"
         overall_risk = max(overall_risk, sanitizer_result["risk_score"])
@@ -279,7 +372,26 @@ else:
     if response.text:
         sanitizer_result = wrdn_output_sanitize(response.text)
 
-        if overall_status == "ALLOWED":
+        # ← CHECK FOR BACKEND ERROR HERE TOO
+        if sanitizer_result.get("backend_error"):
+            backend_down = True
+            overall_status = "BLOCKED"
+            overall_risk = 100
+            print("\n" + "="*60)
+            print("🔒 OUTPUT BLOCKED - BACKEND NOT AVAILABLE")
+            print("="*60)
+            print("All requests blocked (fail-safe protection)")
+            print("📝 Recording block event in registry...")
+            print("="*60 + "\n")
+            
+            # Record the block
+            record_backend_error_block(
+                candidate_name="System",
+                candidate_email="system@wrdn",
+                block_type="text_output",
+                reason="Backend unavailable"
+            )
+        elif overall_status == "ALLOWED":
             overall_status = sanitizer_result["status"]
             overall_risk = sanitizer_result["risk_score"]
         else:

@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import requests
 import re
 import logging
+import pyodbc
 
 from database import get_database_context, save_audit_log
 from embedding_security import embedding_risk_check
@@ -207,31 +208,42 @@ Answer the user based on the database.
     except Exception as e:
         logger.error("Error: %s", str(e))
         return {"error": str(e)}
-    
-    # ADD NEW ENDPOINT HERE
+
+
 @app.post("/sanitize")
 def sanitize_only(request: PromptRequest):
-    raw_ai_output = request.prompt
+    """Sanitize endpoint - checks output for sensitive data"""
+    try:
+        raw_ai_output = request.prompt
 
-    regex_result = regex_output_sanitizer(raw_ai_output)
-    embedding_result = embedding_risk_check(raw_ai_output)
+        regex_result = regex_output_sanitizer(raw_ai_output)
+        embedding_result = embedding_risk_check(raw_ai_output)
 
-    final_risk_score = max(
-        regex_result["risk_score"],
-        embedding_result["risk_score"]
-    )
+        final_risk_score = max(
+            regex_result["risk_score"],
+            embedding_result["risk_score"]
+        )
 
-    if final_risk_score >= BLOCK_THRESHOLD:
+        if final_risk_score >= BLOCK_THRESHOLD:
+            return {
+                "status": "BLOCKED",
+                "risk_score": final_risk_score,
+                "reason": "Output blocked by WRDN sanitizer",
+                "final_output": "[BLOCKED] Sensitive or unsafe AI output was removed."
+            }
+
         return {
-            "status": "BLOCKED",
+            "status": "ALLOWED",
             "risk_score": final_risk_score,
-            "reason": "Output blocked by WRDN sanitizer",
-            "final_output": "[BLOCKED] Sensitive or unsafe AI output was removed."
+            "reason": "Output passed sanitizer",
+            "final_output": raw_ai_output
         }
-
-    return {
-        "status": "ALLOWED",
-        "risk_score": final_risk_score,
-        "reason": "Output passed sanitizer",
-        "final_output": raw_ai_output
-    }
+    
+    except Exception as e:
+        logger.error("Sanitizer error: %s", str(e))
+        return {
+            "status": "ERROR",
+            "risk_score": 0,
+            "reason": f"Sanitizer error: {str(e)}",
+            "final_output": f"[ERROR] {str(e)}"
+        }
