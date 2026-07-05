@@ -6,14 +6,14 @@ WRDN is a FastAPI + Ollama based AI security system that detects and blocks harm
 
 # Project Structure
 
-```text
-WRDN/
+```textWRDN/
  └── version1/
      ├── backend/
      │   ├── main.py
      │   ├── requirements.txt
      │   └── .gitignore
      └── frontend/
+
 ```
 
 ---
@@ -27,7 +27,7 @@ python -m venv venv
 source venv/Scripts/activate
 pip install -r requirements.txt
 py -m uvicorn main:app --reload
-```
+``` 
 
 Backend runs on:
 

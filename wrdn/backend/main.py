@@ -1,22 +1,30 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
+from pathlib import Path
+
 import requests
 import re
 import logging
 import pyodbc
+import json
 
 from database import get_database_context, save_audit_log
 from embedding_security import embedding_risk_check
 
-app = FastAPI()
+
+app = FastAPI(title="WRDN Output Sanitizer Backend")
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger("wrdn.backend")
 
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:3001"],
+    allow_origins=[
+        "http://localhost:3000",
+        "http://localhost:3001",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -27,14 +35,103 @@ class PromptRequest(BaseModel):
     prompt: str
 
 
-@app.get("/")
-def home():
-    return {"message": "WRDN Output Sanitizer backend running"}
-
-
 OLLAMA_GENERATE_URL = "http://localhost:11434/api/generate"
 MAIN_MODEL = "llama3.2"
 BLOCK_THRESHOLD = 70
+
+# Project root path:
+# wrdn/backend/main.py -> parent.parent = wrdn/
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Registry file path:
+# wrdn/demo-wrdn--simulator/Database/registry.txt
+REGISTRY_FILE = BASE_DIR / "demo-wrdn--simulator" / "Database" / "registry.txt"
+
+
+@app.get("/")
+def home():
+    return {
+        "message": "WRDN Output Sanitizer backend running",
+        "available_endpoints": [
+            "GET /",
+            "GET /api/health",
+            "GET /api/registry",
+            "POST /chat",
+            "POST /sanitize",
+        ],
+    }
+
+
+@app.get("/api/health")
+def health_check():
+    return {
+        "status": "running",
+        "service": "WRDN Backend API",
+        "registry_file": str(REGISTRY_FILE),
+        "registry_exists": REGISTRY_FILE.exists(),
+    }
+
+
+@app.get("/api/registry")
+def get_registry():
+    """
+    Reads live registry data from:
+    wrdn/demo-wrdn--simulator/Database/registry.txt
+
+    Frontend can call:
+    GET http://localhost:8000/api/registry
+    """
+    try:
+        if not REGISTRY_FILE.exists():
+            return {
+                "company_name": "WRDN Enterprise",
+                "database_status": "NOT_FOUND",
+                "candidate_evaluations": [],
+                "blocked_emails": [],
+                "error": f"Registry file not found: {str(REGISTRY_FILE)}",
+            }
+
+        content = REGISTRY_FILE.read_text(encoding="utf-8").strip()
+
+        if not content:
+            return {
+                "company_name": "WRDN Enterprise",
+                "database_status": "EMPTY",
+                "candidate_evaluations": [],
+                "blocked_emails": [],
+            }
+
+        data = json.loads(content)
+
+        # Safety defaults if fields are missing
+        return {
+            "company_name": data.get("company_name", "WRDN Enterprise"),
+            "database_status": data.get("database_status", "UNKNOWN"),
+            "candidate_evaluations": data.get("candidate_evaluations", []),
+            "blocked_emails": data.get("blocked_emails", []),
+        }
+
+    except json.JSONDecodeError as error:
+        logger.error("Invalid registry JSON: %s", str(error))
+
+        return {
+            "company_name": "WRDN Enterprise",
+            "database_status": "INVALID_JSON",
+            "candidate_evaluations": [],
+            "blocked_emails": [],
+            "error": str(error),
+        }
+
+    except Exception as error:
+        logger.error("Registry read error: %s", str(error))
+
+        return {
+            "company_name": "WRDN Enterprise",
+            "database_status": "ERROR",
+            "candidate_evaluations": [],
+            "blocked_emails": [],
+            "error": str(error),
+        }
 
 
 def redact_sensitive_parts(raw_ai_output: str):
@@ -52,7 +149,7 @@ def redact_sensitive_parts(raw_ai_output: str):
             pattern,
             r"\1[BLOCKED]",
             redacted_output,
-            flags=re.IGNORECASE
+            flags=re.IGNORECASE,
         )
 
     return redacted_output
@@ -63,8 +160,6 @@ def regex_output_sanitizer(raw_ai_output: str):
         r"(?:rs\.?|lkr|\$)\s*\d+(?:,\d{3})+(?:\.\d+)?": 100,
         r"\b\d{2,3},\d{3}\b": 100,
 
-        r"admin@12345": 100,
-        r"sk-test-company-secret-key-999": 100,
         r"admin@12345": 100,
         r"sk-test-company-secret-key-999": 100,
         r"db_pass_2026_secret": 100,
@@ -113,7 +208,9 @@ def regex_output_sanitizer(raw_ai_output: str):
     return {
         "blocked": highest_score >= BLOCK_THRESHOLD,
         "risk_score": highest_score,
-        "reason": ", ".join(reasons) if reasons else "No regex risk detected in raw AI output"
+        "reason": ", ".join(reasons)
+        if reasons
+        else "No regex risk detected in raw AI output",
     }
 
 
@@ -123,7 +220,7 @@ def final_output_sanitizer(raw_ai_output: str):
 
     final_risk_score = max(
         regex_result["risk_score"],
-        embedding_result["risk_score"]
+        embedding_result["risk_score"],
     )
 
     if final_risk_score >= BLOCK_THRESHOLD:
@@ -138,7 +235,7 @@ def final_output_sanitizer(raw_ai_output: str):
                 if regex_result["risk_score"] >= embedding_result["risk_score"]
                 else embedding_result["reason"]
             ),
-            "final_output": safe_redacted_output
+            "final_output": safe_redacted_output,
         }
 
     return {
@@ -146,7 +243,7 @@ def final_output_sanitizer(raw_ai_output: str):
         "risk_score": final_risk_score,
         "layer": "Output Sanitizer",
         "reason": "Raw AI output passed regex and embedding checks",
-        "final_output": raw_ai_output
+        "final_output": raw_ai_output,
     }
 
 
@@ -172,9 +269,9 @@ Answer the user based on the database.
             json={
                 "model": MAIN_MODEL,
                 "prompt": model_prompt,
-                "stream": False
+                "stream": False,
             },
-            timeout=120
+            timeout=120,
         )
 
         response.raise_for_status()
@@ -185,14 +282,18 @@ Answer the user based on the database.
 
         shield = final_output_sanitizer(raw_ai_output)
 
-        shield_status = "BLOCKED" if shield["risk_score"] >= BLOCK_THRESHOLD else "ALLOWED"
+        shield_status = (
+            "BLOCKED"
+            if shield["risk_score"] >= BLOCK_THRESHOLD
+            else "ALLOWED"
+        )
 
         save_audit_log(
             request.prompt,
             raw_ai_output,
             shield_status,
             shield["risk_score"],
-            f"{shield['layer']} - {shield['reason']}"
+            f"{shield['layer']} - {shield['reason']}",
         )
 
         return {
@@ -202,17 +303,21 @@ Answer the user based on the database.
             "risk_score": shield["risk_score"],
             "detection_layer": shield["layer"],
             "detection_reason": shield["reason"],
-            "final_output": shield["final_output"]
+            "final_output": shield["final_output"],
         }
 
     except Exception as e:
-        logger.error("Error: %s", str(e))
-        return {"error": str(e)}
+        logger.error("Chat error: %s", str(e))
+        return {
+            "error": str(e),
+        }
 
 
 @app.post("/sanitize")
 def sanitize_only(request: PromptRequest):
-    """Sanitize endpoint - checks output for sensitive data"""
+    """
+    Sanitize endpoint - checks output for sensitive data.
+    """
     try:
         raw_ai_output = request.prompt
 
@@ -221,7 +326,7 @@ def sanitize_only(request: PromptRequest):
 
         final_risk_score = max(
             regex_result["risk_score"],
-            embedding_result["risk_score"]
+            embedding_result["risk_score"],
         )
 
         if final_risk_score >= BLOCK_THRESHOLD:
@@ -229,21 +334,22 @@ def sanitize_only(request: PromptRequest):
                 "status": "BLOCKED",
                 "risk_score": final_risk_score,
                 "reason": "Output blocked by WRDN sanitizer",
-                "final_output": "[BLOCKED] Sensitive or unsafe AI output was removed."
+                "final_output": "[BLOCKED] Sensitive or unsafe AI output was removed.",
             }
 
         return {
             "status": "ALLOWED",
             "risk_score": final_risk_score,
             "reason": "Output passed sanitizer",
-            "final_output": raw_ai_output
+            "final_output": raw_ai_output,
         }
-    
+
     except Exception as e:
         logger.error("Sanitizer error: %s", str(e))
+
         return {
             "status": "ERROR",
             "risk_score": 0,
             "reason": f"Sanitizer error: {str(e)}",
-            "final_output": f"[ERROR] {str(e)}"
+            "final_output": f"[ERROR] {str(e)}",
         }

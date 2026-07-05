@@ -54,7 +54,7 @@ logging.basicConfig()
 logging.getLogger().setLevel(logging.DEBUG)
 
 # Insert your Google AI Studio Gemini API Key here (keep secret in production)
-API_KEY = "AQ.Ab8RN6LeeRwgq0xkH9yS_rNEKiPPPrkqcWmS_WjsD8LpJ2tcug"
+API_KEY = ""
 REG_FILE = "Database/registry.txt"
 SALARY_FILE = "Database/salaries.txt"
 
