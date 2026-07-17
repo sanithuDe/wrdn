@@ -1,6 +1,6 @@
 # WRDN - AI Output Sanitizer
 
-WRDN is a FastAPI + Ollama based AI security system that detects and blocks harmful AI-generated outputs using regex filtering and LLM-based classification.
+WRDN is a FastAPI + Google Gemini based AI security system that detects and blocks harmful AI-generated outputs using regex filtering and LLM-based classification.
 
 ---
 
@@ -37,17 +37,17 @@ http://127.0.0.1:8000
 
 ---
 
-# Ollama Setup
+# Gemini (Google) Setup
 
-Install Ollama:
-
-https://ollama.com
-
-Run model:
+Install the official Google GenAI Python SDK and set your API key:
 
 ```bash
-ollama run llama3.2
+pip install google-genai
+set GEMINI_API_KEY=your_api_key_here  # Windows cmd
+export GEMINI_API_KEY=your_api_key_here  # macOS / Linux
 ```
+
+The backend expects `GEMINI_API_KEY` to be available in the environment. You can optionally set `GEMINI_MODEL` and `GEMINI_EMBED_MODEL` environment variables to override defaults.
 
 ---
 # check 

@@ -4,8 +4,14 @@ import json
 import time
 import logging
 import http.client
+from pathlib import Path
+import sys
 from google import genai
 from google.genai import types
+
+ROOT_DIR = Path(__file__).resolve().parents[2]
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
 
 SANITIZER_URL = "http://127.0.0.1:8000/sanitize"
 
@@ -53,8 +59,8 @@ http.client.HTTPConnection.debuglevel = 1
 logging.basicConfig()
 logging.getLogger().setLevel(logging.DEBUG)
 
-# Insert your Google AI Studio Gemini API Key here (keep secret in production)
-API_KEY = ""
+# Use hard-coded key from central config (change wrdn/config.py to rotate key)
+from wrdn.config import GEMINI_API_KEY as API_KEY
 REG_FILE = "Database/registry.txt"
 SALARY_FILE = "Database/salaries.txt"
 
