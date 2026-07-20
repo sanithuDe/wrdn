@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from pathlib import Path
 from typing import Any
 import sys
@@ -15,13 +15,16 @@ import time
 # Project path
 # ---------------------------------------------------------------------------
 
-ROOT_DIR = Path(__file__).resolve().parents[2]
+ROOT_DIR = Path(__file__).resolve().parents[1]
 
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
 # Keep your existing database helper.
-from database import get_database_context, save_audit_log
+from wrdn.backend.database import (
+    get_database_context,
+    save_audit_log,
+)
 
 from wrdn.config import (
     GEMINI_API_KEY,
@@ -565,6 +568,14 @@ def health_check():
         "registry_file": str(REGISTRY_FILE),
         "registry_exists": REGISTRY_FILE.exists(),
     }
+    
+@app.get("/health")
+def docker_health_check():
+    return {
+        "status": "healthy",
+        "service": "WRDN Backend API",
+    }
+    
 
 
 @app.get("/api/test-gemini")
