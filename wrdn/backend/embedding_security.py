@@ -1,11 +1,30 @@
-import requests
 import math
 import logging
+try:
+    from google import genai
+except Exception:
+    genai = None
 
-OLLAMA_EMBED_URL = "http://localhost:11434/api/embeddings"
-EMBED_MODEL = "nomic-embed-text"
+from wrdn.config import GEMINI_API_KEY, GEMINI_EMBED_MODEL
 
 BLOCK_THRESHOLD = 70
+
+if GEMINI_API_KEY and genai is not None:
+    # Prefer module-level configuration which the SDK supports across versions
+    try:
+        if hasattr(genai, "configure"):
+            genai.configure(api_key=GEMINI_API_KEY)
+            GEMINI_CLIENT = None
+        else:
+            GEMINI_CLIENT = genai.Client(api_key=GEMINI_API_KEY)
+    except Exception:
+        # Fall back to attempting a client instance
+        try:
+            GEMINI_CLIENT = genai.Client(api_key=GEMINI_API_KEY)
+        except Exception:
+            GEMINI_CLIENT = None
+else:
+    GEMINI_CLIENT = None
 
 DANGEROUS_OUTPUTS = [
     "The raw AI output reveals passwords, admin passwords, database passwords, or login credentials.",
@@ -19,20 +38,67 @@ DANGEROUS_OUTPUTS = [
 
 
 def get_embedding(text: str):
-    response = requests.post(
-        OLLAMA_EMBED_URL,
-        json={
-            "model": EMBED_MODEL,
-            "prompt": text
-        },
-        timeout=60
-    )
 
-    response.raise_for_status()
-    emb = response.json().get("embedding")
+    if not GEMINI_CLIENT and genai is None:
+        raise RuntimeError("GEMINI embedding client not configured. Set GEMINI_API_KEY and install google-genai in the backend environment.")
+
+    resp = None
+    last_exc = None
+
+    # Try client-level embeddings via models.embed_content
+    try:
+        if GEMINI_CLIENT and hasattr(GEMINI_CLIENT, "models") and hasattr(GEMINI_CLIENT.models, "embed_content"):
+            resp = GEMINI_CLIENT.models.embed_content(
+                model=GEMINI_EMBED_MODEL,
+                contents=[text],
+            )
+    except Exception as e:
+        last_exc = e
+
+    # Try module-level genai.models.embed_content if available
+    if resp is None and genai is not None:
+        try:
+            if hasattr(genai, "models") and hasattr(genai.models, "embed_content"):
+                resp = genai.models.embed_content(
+                    model=GEMINI_EMBED_MODEL,
+                    contents=[text],
+                )
+        except Exception as e:
+            last_exc = e
+
+    if resp is None:
+        logging.error("embedding_security.get_embedding: no embeddings API available (%s)", last_exc)
+        raise RuntimeError("No embeddings API available on google.genai client; ensure google-genai is up-to-date and GEMINI_API_KEY is set.")
+
+    # SDK returns embeddings in various shapes; normalize.
+    emb = None
+    try:
+        embeddings = getattr(resp, "embeddings", None)
+        if embeddings and len(embeddings) > 0:
+            first = embeddings[0]
+            emb = getattr(first, "embedding", None) or (first.get("embedding") if isinstance(first, dict) else None)
+    except Exception:
+        emb = None
 
     if emb is None:
-        raise ValueError("No embedding returned from Ollama")
+        try:
+            data = getattr(resp, "data", None)
+            if data and len(data) > 0:
+                first = data[0]
+                emb = getattr(first, "embedding", None) or (first.get("embedding") if isinstance(first, dict) else None)
+        except Exception:
+            emb = None
+
+    if emb is None:
+        try:
+            if isinstance(resp, dict):
+                emb = resp.get("data", [None])[0].get("embedding")
+        except Exception:
+            emb = getattr(resp, "embedding", None)
+
+    if emb is None:
+        logging.error("embedding_security.get_embedding: failed to extract embedding from response: %s", type(resp))
+        raise ValueError("No embedding returned from Gemini")
 
     logging.debug(
         "embedding_security.get_embedding: text_len=%d emb_len=%s",

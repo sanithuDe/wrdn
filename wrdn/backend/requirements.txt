@@ -2,3 +2,8 @@ fastapi
 uvicorn
 requests
 pydantic
+google-genai
+python-dotenv
+numpy
+pyodbc
+tenacity

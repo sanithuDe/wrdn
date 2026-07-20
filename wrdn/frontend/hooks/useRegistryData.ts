@@ -1,7 +1,7 @@
 "use client";
 
 import { fetchRegistryData } from "@/lib/registryApi";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 export function useRegistryData() {
   const [registryData, setRegistryData] = useState<any>(null);
@@ -9,7 +9,7 @@ export function useRegistryData() {
   const [error, setError] = useState("");
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
-  async function loadRegistryData() {
+  const loadRegistryData = useCallback(async () => {
     try {
       const data = await fetchRegistryData();
 
@@ -17,12 +17,12 @@ export function useRegistryData() {
       setLastUpdated(new Date());
       setError("");
     } catch (err) {
-      console.error(err);
+      console.error("Registry fetch error:", err);
       setError("Failed to load WRDN registry data");
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
 
   useEffect(() => {
     loadRegistryData();
@@ -32,7 +32,7 @@ export function useRegistryData() {
     }, 3000);
 
     return () => clearInterval(intervalId);
-  }, []);
+  }, [loadRegistryData]);
 
   return {
     registryData,
@@ -42,5 +42,3 @@ export function useRegistryData() {
     refresh: loadRegistryData,
   };
 }
-
-
