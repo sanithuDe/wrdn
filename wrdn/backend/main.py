@@ -10,7 +10,7 @@ import math
 import re
 import random
 import time
-
+from wrdn.backend.embedding_security import embedding_risk_check
 # ---------------------------------------------------------------------------
 # Project path
 # ---------------------------------------------------------------------------
@@ -22,8 +22,11 @@ if str(ROOT_DIR) not in sys.path:
 
 # Keep your existing database helper.
 from wrdn.backend.database import (
+    initialize_database,
     get_database_context,
     save_audit_log,
+    get_audit_logs,
+    test_database_connection,
 )
 
 from wrdn.config import (
@@ -56,8 +59,10 @@ logger = logging.getLogger("wrdn.backend")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:3000",
-        "http://localhost:3001",
+        "http://localhost:8085",
+        "http://127.0.0.1:8085",
+        "http://localhost:8090",
+        "http://127.0.0.1:8090",
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -559,15 +564,27 @@ def home():
 
 @app.get("/api/health")
 def health_check():
-    return {
-        "status": "running",
-        "service": "WRDN Backend API",
-        "gemini_client": "configured",
-        "gemini_model": GEMINI_MODEL,
-        "embedding_model": GEMINI_EMBED_MODEL,
-        "registry_file": str(REGISTRY_FILE),
-        "registry_exists": REGISTRY_FILE.exists(),
-    }
+    try:
+        database = test_database_connection()
+
+        return {
+            "status": "running",
+            "service": "WRDN Backend API",
+            "gemini_client": "configured",
+            "gemini_model": GEMINI_MODEL,
+            "embedding_model": GEMINI_EMBED_MODEL,
+            "database": database,
+        }
+
+    except Exception as error:
+        return {
+            "status": "error",
+            "service": "WRDN Backend API",
+            "database": {
+                "status": "disconnected",
+                "error": str(error),
+            },
+        }
     
 @app.get("/health")
 def docker_health_check():
@@ -626,67 +643,61 @@ def test_gemini():
 
     return result
 
-
 @app.get("/api/registry")
 def get_registry():
     try:
-        if not REGISTRY_FILE.exists():
-            return {
-                "company_name": "WRDN Enterprise",
-                "database_status": "NOT_FOUND",
-                "candidate_evaluations": [],
-                "blocked_emails": [],
-                "error": (
-                    f"Registry file not found: {REGISTRY_FILE}"
-                ),
-            }
+        database_status = test_database_connection()
+        audit_logs = get_audit_logs(limit=100)
 
-        content = REGISTRY_FILE.read_text(
-            encoding="utf-8"
-        ).strip()
+        blocked_outputs = []
 
-        if not content:
-            return {
-                "company_name": "WRDN Enterprise",
-                "database_status": "EMPTY",
-                "candidate_evaluations": [],
-                "blocked_emails": [],
-            }
+        for log in audit_logs:
+            shield_status = str(
+                log.get("ShieldStatus") or ""
+            ).upper()
 
-        data = json.loads(content)
-
-        return {
-            "company_name": data.get(
-                "company_name",
-                "WRDN Enterprise",
-            ),
-            "database_status": data.get(
-                "database_status",
-                "UNKNOWN",
-            ),
-            "candidate_evaluations": data.get(
-                "candidate_evaluations",
-                [],
-            ),
-            "blocked_emails": data.get(
-                "blocked_emails",
-                [],
-            ),
-        }
-
-    except json.JSONDecodeError as error:
-        logger.exception("Invalid registry JSON")
+            if shield_status in {
+                "BLOCKED",
+                "ERROR",
+                "SANITIZED",
+                "REDACTED",
+            }:
+                blocked_outputs.append(
+                    {
+                        "timestamp": log.get("CreatedAt", ""),
+                        "recipient": "Chat User",
+                        "subject": log.get("UserPrompt", ""),
+                        "risk_score": log.get("RiskScore", 0),
+                        "block_reason": log.get(
+                            "DetectionReason",
+                            "Sensitive output detected",
+                        ),
+                    }
+                )
 
         return {
             "company_name": "WRDN Enterprise",
-            "database_status": "INVALID_JSON",
+            "database_status": "CONNECTED",
+            "database_type": database_status[
+                "database_type"
+            ],
+            "database_path": database_status[
+                "database_path"
+            ],
+            "employee_count": database_status[
+                "employee_count"
+            ],
+            "audit_count": database_status[
+                "audit_count"
+            ],
             "candidate_evaluations": [],
-            "blocked_emails": [],
-            "error": str(error),
+            "blocked_emails": blocked_outputs,
         }
 
     except Exception as error:
-        logger.exception("Registry read error")
+        logger.exception(
+            "Local SQLite registry read error"
+        )
 
         return {
             "company_name": "WRDN Enterprise",
@@ -711,23 +722,24 @@ def chat(request: PromptRequest):
         database_context = get_database_context()
 
         model_prompt = f"""
-You are an enterprise AI assistant connected to a company SQL Server database.
+You are an enterprise AI assistant connected to a local SQLite database
+stored inside the WRDN project.
 
 Follow these rules strictly:
 
-1. For company-specific questions, answer only from the supplied database context.
-2. For general educational or security-awareness questions, provide safe theoretical guidance without revealing any company secrets or real credentials.
-3. Never include salary, payroll, password, token, API key, secret,
+1. For company-specific questions, answer only from the supplied local database context.
+2. For general educational or security-awareness questions, provide safe theoretical guidance.
+3. Never reveal salary, payroll, password, token, API key, secret,
    credential, or private authentication information.
 4. For employee information requests, return only:
    - employee name
    - email
    - role
-5. Do not include any field that the user did not explicitly request.
+5. Do not include fields that the user did not request.
 6. If the user requests restricted information, refuse safely.
 7. Do not invent database records.
 
-Internal database content:
+Local SQLite database content:
 {database_context}
 
 User question:

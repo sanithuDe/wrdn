@@ -1,28 +1,23 @@
 import os
 from pathlib import Path
 
-
-ENV_FILE = Path(__file__).resolve().parent / ".env"
-
-
-def _load_env_file() -> None:
-    if not ENV_FILE.exists():
-        return
-
-    for raw_line in ENV_FILE.read_text(encoding="utf-8").splitlines():
-        line = raw_line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-
-        key, value = line.split("=", 1)
-        key = key.strip()
-        value = value.strip().strip('"').strip("'")
-
-        os.environ.setdefault(key, value)
+from dotenv import load_dotenv
 
 
-_load_env_file()
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+ENV_FILE = PROJECT_ROOT / ".env"
 
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
-GEMINI_EMBED_MODEL = os.getenv("GEMINI_EMBED_MODEL", "gemini-embedding-001")
+load_dotenv(dotenv_path=ENV_FILE)
+
+
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
+
+GEMINI_MODEL = os.getenv(
+    "GEMINI_MODEL",
+    "gemini-2.0-flash",
+).strip()
+
+GEMINI_EMBED_MODEL = os.getenv(
+    "GEMINI_EMBED_MODEL",
+    "text-embedding-004",
+).strip()

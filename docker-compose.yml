@@ -2,7 +2,7 @@ services:
   backend:
     build:
       context: .
-      dockerfile: ./wrdn/backend/Dockerfile
+      dockerfile: wrdn/backend/Dockerfile
 
     container_name: wrdn-backend
 
@@ -12,38 +12,33 @@ services:
     env_file:
       - .env
 
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+    command: >
+      python -m uvicorn wrdn.backend.main:app
+      --host 0.0.0.0
+      --port 8000
+
+    volumes:
+      - wrdn_database:/app/wrdn/backend/data
 
     restart: unless-stopped
-
-    healthcheck:
-      test:
-        [
-          "CMD",
-          "python",
-          "-c",
-          "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"
-        ]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
 
   frontend:
     build:
       context: ./wrdn/frontend
       dockerfile: Dockerfile
-      args:
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
 
     container_name: wrdn-frontend
 
     ports:
-      - "3000:3000"
+      - "8085:3000"
+
+    environment:
+      INTERNAL_API_URL: http://backend:8000
 
     depends_on:
-      backend:
-        condition: service_healthy
+      - backend
 
     restart: unless-stopped
+
+volumes:
+  wrdn_database:

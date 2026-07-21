@@ -17,10 +17,13 @@ import {
 type TimeFilter = "1h" | "24h" | "7d" | "all";
 
 const API_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+  process.env.NEXT_PUBLIC_API_URL ??
+  "http://localhost:8000";
 
 function parseRegistryTime(timestamp: string) {
-  if (!timestamp) return null;
+  if (!timestamp) {
+    return null;
+  }
 
   const normalized = timestamp.replace(" ", "T");
   const date = new Date(normalized);
@@ -32,7 +35,10 @@ function parseRegistryTime(timestamp: string) {
   return date;
 }
 
-function formatBucket(date: Date, filter: TimeFilter) {
+function formatBucket(
+  date: Date,
+  filter: TimeFilter,
+) {
   if (filter === "1h" || filter === "24h") {
     return date.toLocaleTimeString([], {
       hour: "2-digit",
@@ -47,9 +53,17 @@ function formatBucket(date: Date, filter: TimeFilter) {
 }
 
 function getTimeWindowMs(filter: TimeFilter) {
-  if (filter === "1h") return 60 * 60 * 1000;
-  if (filter === "24h") return 24 * 60 * 60 * 1000;
-  if (filter === "7d") return 7 * 24 * 60 * 60 * 1000;
+  if (filter === "1h") {
+    return 60 * 60 * 1000;
+  }
+
+  if (filter === "24h") {
+    return 24 * 60 * 60 * 1000;
+  }
+
+  if (filter === "7d") {
+    return 7 * 24 * 60 * 60 * 1000;
+  }
 
   return null;
 }
@@ -65,17 +79,6 @@ export default function RegistryDashboard() {
 
   const [timeFilter, setTimeFilter] =
     useState<TimeFilter>("all");
-
-  function scrollToSection(sectionId: string) {
-    const element = document.getElementById(sectionId);
-
-    if (element) {
-      element.scrollIntoView({
-        behavior: "smooth",
-        block: "start",
-      });
-    }
-  }
 
   const candidateEvaluations =
     registryData?.candidate_evaluations || [];
@@ -113,14 +116,16 @@ export default function RegistryDashboard() {
       ),
     );
 
-    const windowMs = getTimeWindowMs(timeFilter);
+    const windowMs =
+      getTimeWindowMs(timeFilter);
 
     const filteredEvents =
       windowMs === null
         ? allEvents
         : allEvents.filter(
             (item: any) =>
-              latestTime - item.date.getTime() <=
+              latestTime -
+                item.date.getTime() <=
               windowMs,
           );
 
@@ -161,7 +166,8 @@ export default function RegistryDashboard() {
         });
       }
 
-      const existing = bucketMap.get(bucket)!;
+      const existing =
+        bucketMap.get(bucket)!;
 
       if (item.eventType === "candidate") {
         existing.candidates += 1;
@@ -231,97 +237,16 @@ export default function RegistryDashboard() {
       : 0;
 
   return (
-    <div className="dashboard-page">
-      <aside className="sidebar">
-        <div>
-          <h2>WRDN</h2>
-
-          <nav>
-            <button
-              className="active"
-              onClick={() =>
-                scrollToSection(
-                  "overview-section",
-                )
-              }
-            >
-              Overview
-            </button>
-
-            <button
-              onClick={() =>
-                scrollToSection(
-                  "live-registry-section",
-                )
-              }
-            >
-              Live Registry
-            </button>
-
-            <button
-              onClick={() =>
-                scrollToSection(
-                  "charts-section",
-                )
-              }
-            >
-              Charts
-            </button>
-
-            <button
-              onClick={() =>
-                scrollToSection(
-                  "candidate-section",
-                )
-              }
-            >
-              Candidate Logs
-            </button>
-
-            <button
-              onClick={() =>
-                scrollToSection(
-                  "blocked-section",
-                )
-              }
-            >
-              Blocked Outputs
-            </button>
-
-            <button
-              onClick={() =>
-                scrollToSection(
-                  "risk-section",
-                )
-              }
-            >
-              Risk Analysis
-            </button>
-
-            <button
-              onClick={() =>
-                scrollToSection(
-                  "settings-section",
-                )
-              }
-            >
-              Settings
-            </button>
-          </nav>
-        </div>
-
-        <p className="sidebar-footer">
-          Prompt Injection Defense
-        </p>
-      </aside>
-
+    <div className="dashboard-content-page">
       <main
         className="main-content"
         id="live-registry-section"
       >
         <header className="topbar">
           <div>
-            <h1>Live Governance Registry</h1>
+            <h1>
+              Live Governance Registry
+            </h1>
 
             <p>
               Real-time WRDN monitoring
@@ -505,7 +430,9 @@ export default function RegistryDashboard() {
 
           <div className="chart-card">
             <div className="panel-header">
-              <h3>Risk Score Trend</h3>
+              <h3>
+                Risk Score Trend
+              </h3>
 
               <p>
                 Highest blocked-output risk
@@ -616,7 +543,9 @@ export default function RegistryDashboard() {
                           {item.candidate}
                         </td>
 
-                        <td>{item.email}</td>
+                        <td>
+                          {item.email}
+                        </td>
 
                         <td>
                           <span className="salary-badge">
@@ -643,7 +572,9 @@ export default function RegistryDashboard() {
           className="panel section-offset"
         >
           <div className="panel-header">
-            <h3>Blocked Email Registry</h3>
+            <h3>
+              Blocked Email Registry
+            </h3>
 
             <p>
               High-risk output attempts
@@ -809,7 +740,9 @@ export default function RegistryDashboard() {
             <div className="setting-row">
               <span>Refresh Interval</span>
 
-              <strong>3 Seconds</strong>
+              <strong>
+                3 Seconds
+              </strong>
             </div>
 
             <div className="setting-row">
@@ -817,7 +750,9 @@ export default function RegistryDashboard() {
                 Selected Time Range
               </span>
 
-              <strong>{timeFilter}</strong>
+              <strong>
+                {timeFilter}
+              </strong>
             </div>
 
             <div className="setting-row">
