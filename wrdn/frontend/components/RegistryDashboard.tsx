@@ -1,7 +1,11 @@
 "use client";
 
-import { useRegistryData } from "@/hooks/useRegistryData";
+import {
+    useRegistryData,
+    type RegistryLog,
+} from "@/hooks/useRegistryData";
 import { useMemo, useState } from "react";
+
 import {
     Area,
     AreaChart,
@@ -17,16 +21,27 @@ import {
 type TimeFilter = "1h" | "24h" | "7d" | "all";
 
 const API_URL =
-  process.env.NEXT_PUBLIC_API_URL ??
-  "http://localhost:8000";
+  process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ||
+  "http://127.0.0.1:8000";
 
-function parseRegistryTime(timestamp: string) {
+function parseRegistryTime(
+  timestamp: string,
+): Date | null {
   if (!timestamp) {
     return null;
   }
 
-  const normalized = timestamp.replace(" ", "T");
-  const date = new Date(normalized);
+  // SQLite CURRENT_TIMESTAMP is stored in UTC.
+  const normalized = timestamp.includes("T")
+    ? timestamp
+    : timestamp.replace(" ", "T");
+
+  const utcTimestamp =
+    normalized.endsWith("Z")
+      ? normalized
+      : `${normalized}Z`;
+
+  const date = new Date(utcTimestamp);
 
   if (Number.isNaN(date.getTime())) {
     return null;
@@ -35,24 +50,17 @@ function parseRegistryTime(timestamp: string) {
   return date;
 }
 
-function formatBucket(
-  date: Date,
-  filter: TimeFilter,
-) {
-  if (filter === "1h" || filter === "24h") {
-    return date.toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+function formatDateTime(timestamp: string): string {
+  const date = parseRegistryTime(timestamp);
+
+  if (!date) {
+    return timestamp || "Unknown";
   }
 
-  return date.toLocaleDateString([], {
-    month: "short",
-    day: "numeric",
-  });
+  return date.toLocaleString();
 }
 
-function getTimeWindowMs(filter: TimeFilter) {
+function getTimeWindowMs(filter: TimeFilter): number | null {
   if (filter === "1h") {
     return 60 * 60 * 1000;
   }
@@ -68,6 +76,27 @@ function getTimeWindowMs(filter: TimeFilter) {
   return null;
 }
 
+function getBucketKey(date: Date, filter: TimeFilter): string {
+  if (filter === "1h") {
+    return date.toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }
+
+  if (filter === "24h") {
+    return date.toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }
+
+  return date.toLocaleDateString([], {
+    month: "short",
+    day: "numeric",
+  });
+}
+
 export default function RegistryDashboard() {
   const {
     registryData,
@@ -80,183 +109,247 @@ export default function RegistryDashboard() {
   const [timeFilter, setTimeFilter] =
     useState<TimeFilter>("all");
 
-  const candidateEvaluations =
-    registryData?.candidate_evaluations || [];
+  function scrollToSection(sectionId: string) {
+    document.getElementById(sectionId)?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  }
 
-  const blockedEmails =
-    registryData?.blocked_emails || [];
+  const calculatedData = useMemo(() => {
+    const allowedLogs = registryData?.allowed_logs ?? [];
+    const blockedLogs = registryData?.blocked_logs ?? [];
 
-  const filteredData = useMemo(() => {
-    const allEvents = [
-      ...candidateEvaluations.map((item: any) => ({
-        ...item,
-        eventType: "candidate",
-        date: parseRegistryTime(item.timestamp),
+    const allLogs = [
+      ...allowedLogs.map((log: RegistryLog) => ({
+        ...log,
+        logType: "allowed" as const,
+        parsedDate: parseRegistryTime(log.timestamp),
       })),
 
-      ...blockedEmails.map((item: any) => ({
-        ...item,
-        eventType: "blocked",
-        date: parseRegistryTime(item.timestamp),
+      ...blockedLogs.map((log: RegistryLog) => ({
+        ...log,
+        logType: "blocked" as const,
+        parsedDate: parseRegistryTime(log.timestamp),
       })),
-    ].filter((item: any) => item.date);
+    ]
+      .filter((log) => log.parsedDate !== null)
+      .sort(
+        (first, second) =>
+          first.parsedDate!.getTime() -
+          second.parsedDate!.getTime(),
+      );
 
-    if (allEvents.length === 0) {
+    if (allLogs.length === 0) {
       return {
-        filteredCandidates: [],
+        filteredAllowed: [],
         filteredBlocked: [],
         activityChartData: [],
         riskChartData: [],
+        highestRiskScore: 0,
+        averageRiskScore: 0,
       };
     }
 
-    const latestTime = Math.max(
-      ...allEvents.map((item: any) =>
-        item.date.getTime(),
-      ),
+    const windowMs = getTimeWindowMs(timeFilter);
+    const currentTime = Date.now();
+
+    const filteredLogs =
+      windowMs === null
+        ? allLogs
+        : allLogs.filter((log) => {
+            const logTime = log.parsedDate!.getTime();
+
+            return currentTime - logTime <= windowMs;
+          });
+
+    const filteredAllowed = filteredLogs.filter(
+      (log) => log.logType === "allowed",
     );
 
-    const windowMs =
-      getTimeWindowMs(timeFilter);
-
-    const filteredEvents =
-      windowMs === null
-        ? allEvents
-        : allEvents.filter(
-            (item: any) =>
-              latestTime -
-                item.date.getTime() <=
-              windowMs,
-          );
-
-    const filteredCandidates =
-      filteredEvents.filter(
-        (item: any) =>
-          item.eventType === "candidate",
-      );
-
-    const filteredBlocked =
-      filteredEvents.filter(
-        (item: any) =>
-          item.eventType === "blocked",
-      );
+    const filteredBlocked = filteredLogs.filter(
+      (log) => log.logType === "blocked",
+    );
 
     const bucketMap = new Map<
       string,
       {
         time: string;
-        candidates: number;
+        allowed: number;
         blocked: number;
-        maxRisk: number;
+        totalRisk: number;
+        highestRisk: number;
+        totalLogs: number;
       }
     >();
 
-    filteredEvents.forEach((item: any) => {
-      const bucket = formatBucket(
-        item.date,
+    filteredLogs.forEach((log) => {
+      const bucket = getBucketKey(
+        log.parsedDate!,
         timeFilter,
       );
 
       if (!bucketMap.has(bucket)) {
         bucketMap.set(bucket, {
           time: bucket,
-          candidates: 0,
+          allowed: 0,
           blocked: 0,
-          maxRisk: 0,
+          totalRisk: 0,
+          highestRisk: 0,
+          totalLogs: 0,
         });
       }
 
-      const existing =
-        bucketMap.get(bucket)!;
+      const bucketRecord = bucketMap.get(bucket)!;
+      const riskScore = Number(log.risk_score || 0);
 
-      if (item.eventType === "candidate") {
-        existing.candidates += 1;
+      bucketRecord.totalLogs += 1;
+      bucketRecord.totalRisk += riskScore;
+      bucketRecord.highestRisk = Math.max(
+        bucketRecord.highestRisk,
+        riskScore,
+      );
+
+      if (log.logType === "allowed") {
+        bucketRecord.allowed += 1;
       }
 
-      if (item.eventType === "blocked") {
-        existing.blocked += 1;
-
-        existing.maxRisk = Math.max(
-          existing.maxRisk,
-          item.risk_score || 0,
-        );
+      if (log.logType === "blocked") {
+        bucketRecord.blocked += 1;
       }
     });
 
-    const activityChartData =
-      Array.from(bucketMap.values());
+    const bucketValues = Array.from(bucketMap.values());
 
-    const riskChartData =
-      activityChartData.map((item) => ({
-        time: item.time,
-        riskScore: item.maxRisk,
-      }));
+    const activityChartData = bucketValues.map((bucket) => ({
+      time: bucket.time,
+      allowed: bucket.allowed,
+      blocked: bucket.blocked,
+    }));
+
+    const riskChartData = bucketValues.map((bucket) => ({
+      time: bucket.time,
+      highestRisk: bucket.highestRisk,
+      averageRisk:
+        bucket.totalLogs > 0
+          ? Math.round(bucket.totalRisk / bucket.totalLogs)
+          : 0,
+    }));
+
+    const riskScores = filteredLogs.map((log) =>
+      Number(log.risk_score || 0),
+    );
+
+    const highestRiskScore =
+      riskScores.length > 0 ? Math.max(...riskScores) : 0;
+
+    const averageRiskScore =
+      riskScores.length > 0
+        ? Math.round(
+            riskScores.reduce(
+              (total, score) => total + score,
+              0,
+            ) / riskScores.length,
+          )
+        : 0;
 
     return {
-      filteredCandidates,
+      filteredAllowed,
       filteredBlocked,
       activityChartData,
       riskChartData,
+      highestRiskScore,
+      averageRiskScore,
     };
-  }, [
-    candidateEvaluations,
-    blockedEmails,
-    timeFilter,
-  ]);
+  }, [registryData, timeFilter]);
 
   if (loading) {
     return (
       <div className="loading-box">
-        Loading WRDN registry...
+        Loading local WRDN registry...
       </div>
     );
   }
 
-  if (error) {
+  if (error || !registryData) {
     return (
       <div className="error-box">
         <h2>Registry Connection Failed</h2>
 
-        <p>{error}</p>
+        <p>
+          {error ||
+            "The backend did not return registry data."}
+        </p>
 
-        <button onClick={refresh}>
+        <button type="button" onClick={refresh}>
           Retry
         </button>
       </div>
     );
   }
 
-  const highestRiskScore =
-    filteredData.filteredBlocked.length > 0
-      ? Math.max(
-          ...filteredData.filteredBlocked.map(
-            (item: any) =>
-              item.risk_score || 0,
-          ),
-        )
-      : 0;
-
   return (
     <div className="dashboard-content-page">
+      {/* <div className="dashboard-section-navigation">
+        <button
+          type="button"
+          onClick={() => scrollToSection("overview-section")}
+        >
+          Overview
+        </button>
+
+        <button
+          type="button"
+          onClick={() => scrollToSection("charts-section")}
+        >
+          Graphs
+        </button>
+
+        <button
+          type="button"
+          onClick={() => scrollToSection("allowed-section")}
+        >
+          Allowed Logs
+        </button>
+
+        <button
+          type="button"
+          onClick={() => scrollToSection("blocked-section")}
+        >
+          Blocked Logs
+        </button>
+
+        <button
+          type="button"
+          onClick={() => scrollToSection("risk-section")}
+        >
+          Risk Analysis
+        </button>
+
+        <button
+          type="button"
+          onClick={() => scrollToSection("settings-section")}
+        >
+          Settings
+        </button>
+      </div> */}
+
       <main
         className="main-content"
         id="live-registry-section"
       >
         <header className="topbar">
           <div>
-            <h1>
-              Live Governance Registry
-            </h1>
+            <h1>Live Governance Registry</h1>
 
             <p>
-              Real-time WRDN monitoring
-              dashboard
+              Local SQLite audit-log monitoring dashboard
             </p>
           </div>
 
           <div className="topbar-right">
             <span className="live-status">
-              System Secure
+              Database Connected
             </span>
 
             <select
@@ -264,29 +357,17 @@ export default function RegistryDashboard() {
               value={timeFilter}
               onChange={(event) =>
                 setTimeFilter(
-                  event.target
-                    .value as TimeFilter,
+                  event.target.value as TimeFilter,
                 )
               }
             >
-              <option value="1h">
-                Last 1 hour
-              </option>
-
-              <option value="24h">
-                Last 24 hours
-              </option>
-
-              <option value="7d">
-                Last 7 days
-              </option>
-
-              <option value="all">
-                All records
-              </option>
+              <option value="1h">Last 1 hour</option>
+              <option value="24h">Last 24 hours</option>
+              <option value="7d">Last 7 days</option>
+              <option value="all">All records</option>
             </select>
 
-            <button onClick={refresh}>
+            <button type="button" onClick={refresh}>
               Refresh
             </button>
           </div>
@@ -297,13 +378,13 @@ export default function RegistryDashboard() {
           className="cards-grid section-offset"
         >
           <div className="card">
-            <p>Company</p>
+            <p>Database</p>
 
             <h2>
-              {registryData.company_name}
+              {registryData.database_type || "SQLite"}
             </h2>
 
-            <span>Protected by WRDN</span>
+            <span>Local project database</span>
           </div>
 
           <div className="card">
@@ -313,37 +394,27 @@ export default function RegistryDashboard() {
               {registryData.database_status}
             </h2>
 
-            <span>
-              Live registry active
-            </span>
+            <span>Live registry active</span>
           </div>
 
           <div className="card">
-            <p>Candidate Evaluations</p>
+            <p>Allowed Logs</p>
 
-            <h2>
-              {
-                filteredData
-                  .filteredCandidates.length
-              }
+            <h2 className="secure-text">
+              {calculatedData.filteredAllowed.length}
             </h2>
 
-            <span>Filtered records</span>
+            <span>Safe AI responses</span>
           </div>
 
           <div className="card">
-            <p>Blocked Emails</p>
+            <p>Blocked Logs</p>
 
             <h2 className="danger-text">
-              {
-                filteredData
-                  .filteredBlocked.length
-              }
+              {calculatedData.filteredBlocked.length}
             </h2>
 
-            <span>
-              Filtered sanitized outputs
-            </span>
+            <span>Restricted AI responses</span>
           </div>
         </section>
 
@@ -360,13 +431,11 @@ export default function RegistryDashboard() {
         >
           <div className="chart-card">
             <div className="panel-header">
-              <h3>
-                Registry Activity Trend
-              </h3>
+              <h3>Allowed and Blocked Activity</h3>
 
               <p>
-                Candidate evaluations and
-                blocked outputs over time.
+                WRDN decisions during the selected time
+                period.
               </p>
             </div>
 
@@ -376,10 +445,7 @@ export default function RegistryDashboard() {
                 height="100%"
               >
                 <AreaChart
-                  data={
-                    filteredData
-                      .activityChartData
-                  }
+                  data={calculatedData.activityChartData}
                 >
                   <CartesianGrid
                     strokeDasharray="3 3"
@@ -408,19 +474,19 @@ export default function RegistryDashboard() {
 
                   <Area
                     type="monotone"
-                    dataKey="candidates"
-                    name="Candidate logs"
+                    dataKey="allowed"
+                    name="Allowed"
                     stroke="#20e487"
-                    fill="rgba(32, 228, 135, 0.18)"
+                    fill="rgba(32,228,135,0.18)"
                     strokeWidth={2}
                   />
 
                   <Area
                     type="monotone"
                     dataKey="blocked"
-                    name="Blocked outputs"
+                    name="Blocked"
                     stroke="#ff506d"
-                    fill="rgba(255, 80, 109, 0.16)"
+                    fill="rgba(255,80,109,0.16)"
                     strokeWidth={2}
                   />
                 </AreaChart>
@@ -430,13 +496,11 @@ export default function RegistryDashboard() {
 
           <div className="chart-card">
             <div className="panel-header">
-              <h3>
-                Risk Score Trend
-              </h3>
+              <h3>Risk Score Trend</h3>
 
               <p>
-                Highest blocked-output risk
-                score per time bucket.
+                Highest and average risk score for each
+                period.
               </p>
             </div>
 
@@ -446,9 +510,7 @@ export default function RegistryDashboard() {
                 height="100%"
               >
                 <LineChart
-                  data={
-                    filteredData.riskChartData
-                  }
+                  data={calculatedData.riskChartData}
                 >
                   <CartesianGrid
                     strokeDasharray="3 3"
@@ -477,10 +539,19 @@ export default function RegistryDashboard() {
 
                   <Line
                     type="monotone"
-                    dataKey="riskScore"
-                    name="Risk score"
+                    dataKey="highestRisk"
+                    name="Highest risk"
                     stroke="#ff506d"
                     strokeWidth={3}
+                    dot
+                  />
+
+                  <Line
+                    type="monotone"
+                    dataKey="averageRisk"
+                    name="Average risk"
+                    stroke="#ffca55"
+                    strokeWidth={2}
                     dot
                   />
                 </LineChart>
@@ -490,17 +561,15 @@ export default function RegistryDashboard() {
         </section>
 
         <section
-          id="candidate-section"
+          id="allowed-section"
           className="panel section-offset"
         >
           <div className="panel-header">
-            <h3>
-              Candidate Evaluation Registry
-            </h3>
+            <h3>Allowed Logs</h3>
 
             <p>
-              Approved salary decisions
-              generated through WRDN workflow.
+              Responses that passed the WRDN security
+              checks.
             </p>
           </div>
 
@@ -509,55 +578,45 @@ export default function RegistryDashboard() {
               <thead>
                 <tr>
                   <th>Timestamp</th>
-                  <th>Candidate</th>
-                  <th>Email</th>
-                  <th>Approved Offer</th>
-                  <th>Justification</th>
+                  <th>User Prompt</th>
+                  <th>AI Output</th>
+                  <th>Status</th>
+                  <th>Risk Score</th>
                 </tr>
               </thead>
 
               <tbody>
-                {filteredData
-                  .filteredCandidates.length ===
+                {calculatedData.filteredAllowed.length ===
                 0 ? (
                   <tr>
                     <td colSpan={5}>
-                      No candidate records found
-                      for this time range.
+                      No allowed logs found for this time
+                      range.
                     </td>
                   </tr>
                 ) : (
-                  filteredData.filteredCandidates.map(
-                    (
-                      item: any,
-                      index: number,
-                    ) => (
-                      <tr
-                        key={`${item.email}-${index}`}
-                      >
+                  calculatedData.filteredAllowed.map(
+                    (log) => (
+                      <tr key={log.id}>
                         <td>
-                          {item.timestamp}
-                        </td>
-
-                        <td>
-                          {item.candidate}
-                        </td>
-
-                        <td>
-                          {item.email}
-                        </td>
-
-                        <td>
-                          <span className="salary-badge">
-                            {
-                              item.approved_max_salary_offer
-                            }
-                          </span>
+                          {formatDateTime(log.timestamp)}
                         </td>
 
                         <td className="long-text">
-                          {item.justification}
+                          {log.user_prompt}
                         </td>
+
+                        <td className="long-text">
+                          {log.raw_ai_output}
+                        </td>
+
+                        <td>
+                          <span className="allowed-badge">
+                            {log.shield_status}
+                          </span>
+                        </td>
+
+                        <td>{log.risk_score}/100</td>
                       </tr>
                     ),
                   )
@@ -572,13 +631,10 @@ export default function RegistryDashboard() {
           className="panel section-offset"
         >
           <div className="panel-header">
-            <h3>
-              Blocked Email Registry
-            </h3>
+            <h3>Blocked Logs</h3>
 
             <p>
-              High-risk output attempts
-              blocked by WRDN sanitizer.
+              Responses blocked or stopped by WRDN.
             </p>
           </div>
 
@@ -587,51 +643,44 @@ export default function RegistryDashboard() {
               <thead>
                 <tr>
                   <th>Timestamp</th>
-                  <th>Recipient</th>
-                  <th>Subject</th>
+                  <th>User Prompt</th>
+                  <th>Status</th>
                   <th>Risk Score</th>
-                  <th>Block Reason</th>
+                  <th>Detection Reason</th>
                 </tr>
               </thead>
 
               <tbody>
-                {filteredData.filteredBlocked
-                  .length === 0 ? (
+                {calculatedData.filteredBlocked.length ===
+                0 ? (
                   <tr>
                     <td colSpan={5}>
-                      No blocked outputs found
-                      for this time range.
+                      No blocked logs found for this time
+                      range.
                     </td>
                   </tr>
                 ) : (
-                  filteredData.filteredBlocked.map(
-                    (
-                      item: any,
-                      index: number,
-                    ) => (
-                      <tr
-                        key={`${item.recipient}-${index}`}
-                      >
+                  calculatedData.filteredBlocked.map(
+                    (log) => (
+                      <tr key={log.id}>
                         <td>
-                          {item.timestamp}
+                          {formatDateTime(log.timestamp)}
                         </td>
 
-                        <td>
-                          {item.recipient}
-                        </td>
-
-                        <td>
-                          {item.subject}
+                        <td className="long-text">
+                          {log.user_prompt}
                         </td>
 
                         <td>
                           <span className="risk-badge">
-                            {item.risk_score}
+                            {log.shield_status}
                           </span>
                         </td>
 
-                        <td>
-                          {item.block_reason}
+                        <td>{log.risk_score}/100</td>
+
+                        <td className="long-text">
+                          {log.detection_reason}
                         </td>
                       </tr>
                     ),
@@ -650,59 +699,47 @@ export default function RegistryDashboard() {
             <h3>Risk Analysis</h3>
 
             <p>
-              Live security summary based on
-              selected time range.
+              Security summary for the selected period.
             </p>
           </div>
 
           <div className="cards-grid">
             <div className="card">
-              <p>Highest Risk Score</p>
+              <p>Highest Risk</p>
 
               <h2 className="danger-text">
-                {highestRiskScore}
+                {calculatedData.highestRiskScore}
               </h2>
 
-              <span>
-                Maximum detected risk
-              </span>
+              <span>Maximum detected score</span>
             </div>
 
             <div className="card">
-              <p>Blocked Attempts</p>
+              <p>Average Risk</p>
 
               <h2>
-                {
-                  filteredData
-                    .filteredBlocked.length
-                }
+                {calculatedData.averageRiskScore}
               </h2>
 
-              <span>
-                Total sanitized outputs
-              </span>
+              <span>Average across filtered logs</span>
             </div>
 
             <div className="card">
-              <p>Protection Layer</p>
+              <p>Total Audit Logs</p>
 
-              <h2>Sanitizer</h2>
+              <h2>{registryData.audit_count ?? 0}</h2>
 
-              <span>
-                Output filtering active
-              </span>
+              <span>Stored in local SQLite</span>
             </div>
 
             <div className="card">
-              <p>Registry Mode</p>
+              <p>Protection</p>
 
               <h2 className="secure-text">
-                LIVE
+                ACTIVE
               </h2>
 
-              <span>
-                Auto refresh enabled
-              </span>
+              <span>Gemini output monitoring</span>
             </div>
           </div>
         </section>
@@ -715,54 +752,40 @@ export default function RegistryDashboard() {
             <h3>Settings</h3>
 
             <p>
-              Current WRDN frontend and backend
-              connection details.
+              Current frontend, backend and database
+              connection information.
             </p>
           </div>
 
           <div className="settings-grid">
             <div className="setting-row">
-              <span>Frontend</span>
+              <span>Backend API</span>
 
-              <strong>
-                Next.js Dashboard
-              </strong>
+              <strong>{API_URL}</strong>
             </div>
 
             <div className="setting-row">
-              <span>Backend API</span>
+              <span>Registry Endpoint</span>
 
-              <strong>
-                {API_URL}/api/registry
-              </strong>
+              <strong>{API_URL}/api/registry</strong>
+            </div>
+
+            <div className="setting-row">
+              <span>Database</span>
+
+              <strong>Local SQLite</strong>
             </div>
 
             <div className="setting-row">
               <span>Refresh Interval</span>
 
-              <strong>
-                3 Seconds
-              </strong>
+              <strong>3 seconds</strong>
             </div>
 
             <div className="setting-row">
-              <span>
-                Selected Time Range
-              </span>
+              <span>Selected Time Range</span>
 
-              <strong>
-                {timeFilter}
-              </strong>
-            </div>
-
-            <div className="setting-row">
-              <span>
-                Protection Status
-              </span>
-
-              <strong className="secure-text">
-                Enabled
-              </strong>
+              <strong>{timeFilter}</strong>
             </div>
           </div>
         </section>

@@ -4,6 +4,7 @@ export type AppSection =
   | "chat"
   | "dashboard"
   | "live-registry"
+  | "allowed"
   | "blocked"
   | "risk"
   | "settings";
@@ -84,6 +85,19 @@ export default function AppSidebar({
             }
           >
             Live Registry
+          </button>
+
+          <button
+            className={
+              activeSection === "allowed"
+                ? "active"
+                : ""
+            }
+            onClick={() =>
+              onSectionChange("allowed")
+            }
+          >
+            Allowed Logs
           </button>
 
           <button

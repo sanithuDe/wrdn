@@ -19,7 +19,9 @@ export default function Home() {
   const isChat = activeSection === "chat";
 
   function startNewChat() {
-    setResetSignal((current) => current + 1);
+    setResetSignal(
+      (current) => current + 1,
+    );
   }
 
   useEffect(() => {
@@ -32,22 +34,26 @@ export default function Home() {
       string
     > = {
       dashboard: "overview-section",
-      "live-registry": "live-registry-section",
+      "live-registry":
+        "live-registry-section",
+      allowed: "allowed-section",
       blocked: "blocked-section",
       risk: "risk-section",
       settings: "settings-section",
     };
 
-    const sectionId = sectionMap[activeSection];
+    const sectionId =
+      sectionMap[activeSection];
 
-    const timeoutId = window.setTimeout(() => {
-      document
-        .getElementById(sectionId)
-        ?.scrollIntoView({
-          behavior: "smooth",
-          block: "start",
-        });
-    }, 100);
+    const timeoutId =
+      window.setTimeout(() => {
+        document
+          .getElementById(sectionId)
+          ?.scrollIntoView({
+            behavior: "smooth",
+            block: "start",
+          });
+      }, 100);
 
     return () =>
       window.clearTimeout(timeoutId);
@@ -57,7 +63,9 @@ export default function Home() {
     <div className="wrdn-application">
       <AppSidebar
         activeSection={activeSection}
-        onSectionChange={setActiveSection}
+        onSectionChange={
+          setActiveSection
+        }
         onNewChat={startNewChat}
       />
 
