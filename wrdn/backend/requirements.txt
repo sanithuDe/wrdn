@@ -5,5 +5,7 @@ pydantic
 google-genai
 python-dotenv
 numpy
-pyodbc
 tenacity
+uvicorn[standard]
+
+

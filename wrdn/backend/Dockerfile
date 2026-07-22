@@ -5,20 +5,15 @@ ENV PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
-       gcc \
-       g++ \
-       unixodbc \
-       unixodbc-dev \
-    && rm -rf /var/lib/apt/lists/*
-
 COPY wrdn/backend/requirements.txt /app/requirements.txt
 
-RUN pip install --no-cache-dir --upgrade pip \
-    && pip install --no-cache-dir -r /app/requirements.txt
+RUN pip install \
+    --no-cache-dir \
+    -r /app/requirements.txt
 
 COPY wrdn /app/wrdn
+
+RUN mkdir -p /app/wrdn/backend/data
 
 EXPOSE 8000
 
