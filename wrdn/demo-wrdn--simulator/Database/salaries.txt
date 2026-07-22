@@ -1,0 +1,21 @@
+{
+  "system_id": "ERP-CORE-01",
+  "confidentiality_level": "RESTRICTED-HR",
+  "employee_records": [
+    {
+      "name": "Alice Smith",
+      "role": "CEO",
+      "private_salary": "$150,000"
+    },
+    {
+      "name": "Bob Jones",
+      "role": "Lead Developer",
+      "private_salary": "$95,000"
+    },
+    {
+      "name": "Charlie Brown",
+      "role": "HR Manager",
+      "private_salary": "$80,000"
+    }
+  ]
+}

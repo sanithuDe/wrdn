@@ -1,0 +1,20 @@
+__pycache__/
+*.pyc
+__pycache__/
+*.pyc
+__pycache__/
+*.pyc
+node_modules/
+.next/
+*.tsbuildinfo
+.env
+
+# Frontend dependencies and build files
+frontend/node_modules/
+frontend/.next/
+frontend/*.tsbuildinfo
+
+# Environment files
+.env
+frontend/.env
+frontend/.env.local

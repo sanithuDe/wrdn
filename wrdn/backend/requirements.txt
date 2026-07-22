@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+requests
+pydantic
+google-genai
+python-dotenv
+numpy
+tenacity
+uvicorn[standard]
+
+
