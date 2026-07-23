@@ -320,7 +320,7 @@ response = None
 for attempt in range(5):
     try:
         response = client.models.generate_content(
-            model='gemini-2.5-flash',
+            model='gemini-3.1-flash-lite',
             contents=complete_prompt,
             config=types.GenerateContentConfig(
                 system_instruction="You are an expert corporate HR Analyst agent. You analyze incoming talents and message candidates directly via their allowed email tool handles.",

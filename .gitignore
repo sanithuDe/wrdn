@@ -18,3 +18,31 @@ frontend/*.tsbuildinfo
 .env
 frontend/.env
 frontend/.env.local
+
+# Environment secrets
+.env
+wrdn/frontend/.env.local
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Next.js
+wrdn/frontend/.next/
+wrdn/frontend/node_modules/
+
+# Local database
+wrdn/backend/data/
+*.db
+
+# Uploaded requirement files
+wrdn/backend/secure_uploads/
+
+# WRDN requirement uploads
+wrdn/backend/secure_uploads/*
+!wrdn/backend/secure_uploads/.gitkeep
+!wrdn/backend/secure_uploads/pending/
+!wrdn/backend/secure_uploads/approved/
+!wrdn/backend/secure_uploads/rejected/
+!wrdn/backend/secure_uploads/expired/
