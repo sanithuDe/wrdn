@@ -155,6 +155,12 @@ class PromptRequest(BaseModel):
 # GEMINI TEXT GENERATION
 # =========================================================
 
+FALLBACK_GEMINI_MODELS = [
+    "gemini-flash-lite-latest",
+    "gemini-3.1-flash-lite",
+    "gemini-flash-latest",
+]
+
 def ask_gemini(
     prompt: str,
     max_retries: int = 4,
@@ -187,64 +193,94 @@ def ask_gemini(
         "temporarily unavailable",
     )
 
+    def is_model_not_found(error_message: str) -> bool:
+        return (
+            "not_found" in error_message
+            or "not found" in error_message
+            or "unsupported for generatecontent" in error_message
+        )
+
+    models_to_try = [
+        GEMINI_MODEL,
+        *[
+            model for model in FALLBACK_GEMINI_MODELS
+            if model != GEMINI_MODEL
+        ],
+    ]
+
     last_error: Exception | None = None
 
-    for attempt in range(max_retries):
-        try:
-            response = (
-                GEMINI_CLIENT.models.generate_content(
-                    model=GEMINI_MODEL,
-                    contents=cleaned_prompt,
-                )
-            )
-
-            generated_text = getattr(
-                response,
-                "text",
-                None,
-            )
-
-            if not generated_text:
-                raise RuntimeError(
-                    "Gemini returned an empty response."
+    for model in models_to_try:
+        for attempt in range(max_retries):
+            try:
+                response = (
+                    GEMINI_CLIENT.models.generate_content(
+                        model=model,
+                        contents=cleaned_prompt,
+                    )
                 )
 
-            return generated_text.strip()
+                generated_text = getattr(
+                    response,
+                    "text",
+                    None,
+                )
 
-        except Exception as error:
-            last_error = error
-            error_message = str(error).lower()
+                if not generated_text:
+                    raise RuntimeError(
+                        "Gemini returned an empty response."
+                    )
 
-            retryable = any(
-                value in error_message
-                for value in retryable_errors
-            )
+                return generated_text.strip()
 
-            if not retryable:
-                raise RuntimeError(
-                    f"Gemini text generation failed: {error}"
-                ) from error
+            except Exception as error:
+                last_error = error
+                error_message = str(error).lower()
 
-            if attempt == max_retries - 1:
-                break
+                if is_model_not_found(error_message):
+                    logger.warning(
+                        "Gemini model '%s' is not available or not supported; "
+                        "trying fallback models.",
+                        model,
+                    )
+                    break
 
-            wait_seconds = (
-                2 ** (attempt + 1)
-                + random.uniform(0, 1)
-            )
+                retryable = any(
+                    value in error_message
+                    for value in retryable_errors
+                )
 
-            logger.warning(
-                "Temporary Gemini error. "
-                "Attempt %s/%s failed. "
-                "Retrying in %.2f seconds. "
-                "Error: %s",
-                attempt + 1,
-                max_retries,
-                wait_seconds,
-                error,
-            )
+                if not retryable:
+                    raise RuntimeError(
+                        f"Gemini text generation failed: {error}"
+                    ) from error
 
-            time.sleep(wait_seconds)
+                if attempt == max_retries - 1:
+                    break
+
+                wait_seconds = (
+                    2 ** (attempt + 1)
+                    + random.uniform(0, 1)
+                )
+
+                logger.warning(
+                    "Temporary Gemini error. "
+                    "Attempt %s/%s failed for model %s. "
+                    "Retrying in %.2f seconds. "
+                    "Error: %s",
+                    attempt + 1,
+                    max_retries,
+                    model,
+                    wait_seconds,
+                    error,
+                )
+
+                time.sleep(wait_seconds)
+
+        if last_error is not None and is_model_not_found(str(last_error).lower()):
+            continue
+        if last_error is None:
+            break
 
     raise RuntimeError(
         "Gemini is temporarily unavailable after "

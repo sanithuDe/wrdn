@@ -25,12 +25,12 @@ GEMINI_API_KEY = os.getenv(
 
 GEMINI_MODEL = os.getenv(
     "GEMINI_MODEL",
-    "gemini-2.0-flash",
+    "gemini-flash-lite-latest",
 ).strip()
 
 GEMINI_EMBED_MODEL = os.getenv(
     "GEMINI_EMBED_MODEL",
-    "text-embedding-004",
+    "gemini-embedding-001",
 ).strip()
 
 
