@@ -355,192 +355,196 @@ export default function ChatInterface({
       </header>
 
       <div className="chat-body">
-        <div className="chat-content">
-          {messages.length === 0 ? (
-            <div className="chat-welcome">
-              <div className="welcome-logo">W</div>
-              <h2>How can WRDN help you?</h2>
-              <p>
-                Ask questions about your organization.
-                Every generated answer is checked before
-                it is displayed.
-              </p>
+        <div className="chat-main">
+          <div className="chat-content">
+            {messages.length === 0 ? (
+              <div className="chat-welcome">
+                <div className="welcome-logo">W</div>
+                <h2>How can WRDN help you?</h2>
+                <p>
+                  Ask questions about your organization.
+                  Every generated answer is checked before
+                  it is displayed.
+                </p>
 
-              <div className="starter-grid">
-                {starterQuestions.map((question) => (
-                  <button
-                    key={question}
-                    type="button"
-                    onClick={() =>
-                      void submitMessage(question)
-                    }
-                    disabled={
-                      sending || !clientId.trim()
-                    }
-                  >
-                    <span>{question}</span>
-                    <strong>→</strong>
-                  </button>
-                ))}
+                <div className="starter-grid">
+                  {starterQuestions.map((question) => (
+                    <button
+                      key={question}
+                      type="button"
+                      onClick={() =>
+                        void submitMessage(question)
+                      }
+                      disabled={
+                        sending || !clientId.trim()
+                      }
+                    >
+                      <span>{question}</span>
+                      <strong>→</strong>
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
-          ) : (
-            <div className="messages-container">
-              {messages.map((message) => (
-                <article
-                  key={message.id}
-                  className={`chat-message ${message.role}`}
-                >
-                  <div className="message-avatar">
-                    {message.role === "user"
-                      ? "U"
-                      : "W"}
-                  </div>
-
-                  <div className="message-body">
-                    <div className="message-heading">
-                      <strong>
-                        {message.role === "user"
-                          ? "You"
-                          : "WRDN Assistant"}
-                      </strong>
-
-                      {message.role === "assistant" &&
-                        message.status && (
-                          <span
-                            className={`shield-badge ${getStatusClass(
-                              message.status,
-                            )}`}
-                          >
-                            {message.status}
-                          </span>
-                        )}
+            ) : (
+              <div className="messages-container">
+                {messages.map((message) => (
+                  <article
+                    key={message.id}
+                    className={`chat-message ${message.role}`}
+                  >
+                    <div className="message-avatar">
+                      {message.role === "user"
+                        ? "U"
+                        : "W"}
                     </div>
 
-                    <p className="message-text">
-                      {message.content}
-                    </p>
+                    <div className="message-body">
+                      <div className="message-heading">
+                        <strong>
+                          {message.role === "user"
+                            ? "You"
+                            : "WRDN Assistant"}
+                        </strong>
 
-                    {message.role === "assistant" && (
-                      <div className="security-details">
-                        <div>
-                          <span>Risk Score</span>
-                          <strong>
-                            {message.riskScore ?? 0}/100
-                          </strong>
-                        </div>
-                        <div>
-                          <span>Detection Layer</span>
-                          <strong>
-                            {message.detectionLayer ||
-                              "WRDN Security"}
-                          </strong>
-                        </div>
-                        {message.detectionReason && (
+                        {message.role === "assistant" &&
+                          message.status && (
+                            <span
+                              className={`shield-badge ${getStatusClass(
+                                message.status,
+                              )}`}
+                            >
+                              {message.status}
+                            </span>
+                          )}
+                      </div>
+
+                      <p className="message-text">
+                        {message.content}
+                      </p>
+
+                      {message.role === "assistant" && (
+                        <div className="security-details">
                           <div>
-                            <span>Detection Reason</span>
+                            <span>Risk Score</span>
                             <strong>
-                              {message.detectionReason}
+                              {message.riskScore ?? 0}/100
                             </strong>
                           </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </article>
-              ))}
+                          <div>
+                            <span>Detection Layer</span>
+                            <strong>
+                              {message.detectionLayer ||
+                                "WRDN Security"}
+                            </strong>
+                          </div>
+                          {message.detectionReason && (
+                            <div>
+                              <span>Detection Reason</span>
+                              <strong>
+                                {message.detectionReason}
+                              </strong>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </article>
+                ))}
 
-              {sending && (
-                <article className="chat-message assistant">
-                  <div className="message-avatar">W</div>
-                  <div className="message-body">
-                    <p className="message-text">
-                      Thinking…
-                    </p>
-                  </div>
-                </article>
-              )}
+                {sending && (
+                  <article className="chat-message assistant">
+                    <div className="message-avatar">W</div>
+                    <div className="message-body">
+                      <p className="message-text">
+                        Thinking…
+                      </p>
+                    </div>
+                  </article>
+                )}
 
-              <div ref={messageEndRef} />
-            </div>
+                <div ref={messageEndRef} />
+              </div>
+            )}
+          </div>
+
+          {error && (
+            <p className="chat-error">{error}</p>
           )}
+
+          <div className="chat-input-area">
+            <form
+              className="chat-form"
+              onSubmit={handleSubmit}
+            >
+              <textarea
+                value={input}
+                onChange={(event) =>
+                  setInput(event.target.value)
+                }
+                onKeyDown={handleKeyDown}
+                placeholder="Ask WRDN a question…"
+                rows={1}
+                disabled={sending || !clientId.trim()}
+              />
+              <button
+                type="submit"
+                disabled={
+                  sending ||
+                  !input.trim() ||
+                  !clientId.trim()
+                }
+                aria-label="Send message"
+              >
+                →
+              </button>
+            </form>
+            <p className="chat-disclaimer">
+              WRDN checks every answer before it is shown.
+            </p>
+          </div>
         </div>
 
         <aside className="chat-history-panel">
-          <div className="chat-history-header">
-            <p className="chat-history-label">
-              Recent chats
-            </p>
-            <button
-              type="button"
-              className="chat-history-new"
-              onClick={() => onNewChat?.()}
-            >
-              New
-            </button>
-          </div>
-
-          <div className="chat-history-list">
-            {recentChats.length === 0 ? (
-              <p className="chat-history-empty">
-                Send a message, then start a new chat to
-                keep it here.
+          <div className="chat-history-dock">
+            <div className="chat-history-header">
+              <p className="chat-history-label">
+                Recent chats
               </p>
-            ) : (
-              recentChats.slice(0, 5).map((chat) => (
-                <button
-                  key={chat.id}
-                  type="button"
-                  className={`chat-history-item${
-                    activeChatId === chat.id
-                      ? " active"
-                      : ""
-                  }`}
-                  title={chat.title}
-                  onClick={() => onSelectChat?.(chat.id)}
-                >
-                  {chat.title}
-                </button>
-              ))
-            )}
+              <button
+                type="button"
+                className="chat-history-new"
+                onClick={() => onNewChat?.()}
+              >
+                New
+              </button>
+            </div>
+
+            <div className="chat-history-list">
+              {recentChats.length === 0 ? (
+                <p className="chat-history-empty">
+                  Send a message, then start a new chat to
+                  keep it here.
+                </p>
+              ) : (
+                recentChats.slice(0, 5).map((chat) => (
+                  <button
+                    key={chat.id}
+                    type="button"
+                    className={`chat-history-item${
+                      activeChatId === chat.id
+                        ? " active"
+                        : ""
+                    }`}
+                    title={chat.title}
+                    onClick={() => onSelectChat?.(chat.id)}
+                  >
+                    {chat.title}
+                  </button>
+                ))
+              )}
+            </div>
           </div>
         </aside>
-      </div>
-
-      {error && (
-        <p className="chat-error">{error}</p>
-      )}
-
-      <div className="chat-input-area">
-        <form
-          className="chat-form"
-          onSubmit={handleSubmit}
-        >
-          <textarea
-            value={input}
-            onChange={(event) =>
-              setInput(event.target.value)
-            }
-            onKeyDown={handleKeyDown}
-            placeholder="Ask WRDN a question…"
-            rows={1}
-            disabled={sending || !clientId.trim()}
-          />
-          <button
-            type="submit"
-            disabled={
-              sending ||
-              !input.trim() ||
-              !clientId.trim()
-            }
-            aria-label="Send message"
-          >
-            →
-          </button>
-        </form>
-        <p className="chat-disclaimer">
-          WRDN checks every answer before it is shown.
-        </p>
       </div>
     </section>
   );

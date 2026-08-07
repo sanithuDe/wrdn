@@ -30,7 +30,7 @@ export default function AppSidebar({
 }: AppSidebarProps) {
   return (
     <aside className="app-sidebar">
-      <div>
+      <div className="app-sidebar-top">
         <div className="app-brand">
           <div className="app-brand-logo">
             W
@@ -155,13 +155,7 @@ export default function AppSidebar({
         </div>
 
         {username && (
-          <p
-            style={{
-              color: "#94a3b8",
-              fontSize: 12,
-              marginTop: 12,
-            }}
-          >
+          <p className="sidebar-user">
             Signed in as {username}
             {isAdmin ? " (ADMIN)" : " (EMPLOYEE)"}
           </p>
@@ -170,17 +164,8 @@ export default function AppSidebar({
         {onLogout && (
           <button
             type="button"
+            className="sidebar-logout"
             onClick={onLogout}
-            style={{
-              marginTop: 8,
-              width: "100%",
-              padding: 8,
-              borderRadius: 8,
-              border: "1px solid #334155",
-              background: "#111827",
-              color: "#e2e8f0",
-              cursor: "pointer",
-            }}
           >
             Logout
           </button>
