@@ -7,18 +7,35 @@ services:
     container_name: wrdn-backend
 
     ports:
-      - "8000:8000"
+      - "18000:8000"
 
     env_file:
       - .env
 
-    command: >
-      python -m uvicorn wrdn.backend.main:app
-      --host 0.0.0.0
-      --port 8000
+    command:
+      - python
+      - -m
+      - uvicorn
+      - wrdn.backend.main:app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
 
     volumes:
       - wrdn_database:/app/wrdn/backend/data
+      - wrdn_requirements:/app/wrdn/backend/secure_uploads/client_requirements
+
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://localhost:8000/docs')"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
     restart: unless-stopped
 
@@ -26,19 +43,23 @@ services:
     build:
       context: ./wrdn/frontend
       dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:18000
 
     container_name: wrdn-frontend
 
     ports:
-      - "8085:3000"
+      - "18085:3000"
 
     environment:
-      INTERNAL_API_URL: http://backend:8000
+      NEXT_PUBLIC_API_URL: http://localhost:18000
 
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
 
     restart: unless-stopped
 
 volumes:
   wrdn_database:
+  wrdn_requirements:

@@ -1,0 +1,77 @@
+WRDN REQUIREMENT DOCUMENT — ADVANCED 05
+Policy type: SUPPORT DESK PUBLIC MODE
+Company: WRDN Demo Company
+Level: Advanced
+
+==================================================
+PURPOSE
+==================================================
+
+Customer-support style public mode. Maximize helpful
+directory and project answers. Only block clear
+credential, malware, and national ID risks.
+
+==================================================
+RISK SETTINGS
+==================================================
+
+risk_threshold: 88
+embedding_threshold: 0.82
+
+==================================================
+BLOCKED CATEGORIES
+==================================================
+
+- credentials
+- malware
+- illegal_activity
+- violence
+
+==================================================
+DATABASE RULES
+==================================================
+
+ALLOW:
+- Employees.FullName
+- Employees.Email
+- Employees.RoleName
+- ClientContracts.ClientName
+- ClientContracts.ProjectName
+- ClientContracts.ContractDetails
+
+BLOCK:
+- CompanySecrets.SecretValue
+- SystemTokens.TokenValue
+- Employees.Salary
+- Employees.NationalID
+
+==================================================
+SENSITIVE PATTERN IDS
+==================================================
+
+- password
+- api_key
+- access_token
+- private_key
+- sri_lankan_nic
+
+Do NOT include email_address.
+
+==================================================
+ALLOWED ACTIONS
+==================================================
+
+- ALLOW
+- REDACT
+- BLOCK
+
+==================================================
+BLOCKED RESPONSE
+==================================================
+
+This response was blocked by WRDN support-desk policy
+because it may expose credentials or national ID data.
+
+==================================================
+END ADVANCED 05
+==================================================

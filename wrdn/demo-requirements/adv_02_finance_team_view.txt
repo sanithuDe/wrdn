@@ -1,0 +1,87 @@
+WRDN REQUIREMENT DOCUMENT — ADVANCED 02
+Policy type: FINANCE TEAM VIEW
+Company: WRDN Demo Company
+Level: Advanced
+
+==================================================
+PURPOSE
+==================================================
+
+Finance-oriented policy. Allow salary and contract payment
+answers for internal finance work. Still block credentials
+and national ID.
+
+==================================================
+RISK SETTINGS
+==================================================
+
+risk_threshold: 78
+embedding_threshold: 0.76
+
+==================================================
+BLOCKED CATEGORIES
+==================================================
+
+- credentials
+- personal_information
+- malware
+- illegal_activity
+- violence
+
+Do NOT block financial_records.
+Do NOT block employee_information.
+
+==================================================
+DATABASE RULES
+==================================================
+
+ALLOW:
+- Employees.FullName
+- Employees.Email
+- Employees.RoleName
+- Employees.Salary
+- ClientContracts.ClientName
+- ClientContracts.ProjectName
+- ClientContracts.PaymentAmount
+- ClientContracts.ContractDetails
+
+BLOCK:
+- Employees.NationalID
+- Employees.PhoneNumber
+- Employees.AddressLine
+- CompanySecrets.SecretValue
+- SystemTokens.TokenValue
+- ClientContracts.ConfidentialNotes
+
+==================================================
+SENSITIVE PATTERN IDS
+==================================================
+
+- password
+- api_key
+- access_token
+- private_key
+- sri_lankan_nic
+- phone_number
+
+Do NOT include email_address.
+Do NOT include bank_account as a hard block for salary text.
+
+==================================================
+ALLOWED ACTIONS
+==================================================
+
+- ALLOW
+- REDACT
+- BLOCK
+
+==================================================
+BLOCKED RESPONSE
+==================================================
+
+This response was blocked by WRDN finance policy
+because it may expose credentials or national identity data.
+
+==================================================
+END ADVANCED 02
+==================================================

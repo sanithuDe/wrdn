@@ -20,6 +20,15 @@ import {
 
 type TimeFilter = "1h" | "24h" | "7d" | "all";
 
+const TIME_FILTERS: TimeFilter[] = ["1h", "24h", "7d", "all"];
+
+/** Survives section navigation; resets to "all" on full page refresh. */
+let persistedTimeFilter: TimeFilter = "all";
+
+function isTimeFilter(value: string): value is TimeFilter {
+  return TIME_FILTERS.includes(value as TimeFilter);
+}
+
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ||
   "http://127.0.0.1:8000";
@@ -106,8 +115,18 @@ export default function RegistryDashboard() {
     refresh,
   } = useRegistryData();
 
-  const [timeFilter, setTimeFilter] =
-    useState<TimeFilter>("all");
+  const [timeFilter, setTimeFilter] = useState<TimeFilter>(
+    persistedTimeFilter,
+  );
+
+  function handleTimeFilterChange(value: string) {
+    if (!isTimeFilter(value)) {
+      return;
+    }
+
+    persistedTimeFilter = value;
+    setTimeFilter(value);
+  }
 
   function scrollToSection(sectionId: string) {
     document.getElementById(sectionId)?.scrollIntoView({
@@ -136,8 +155,8 @@ export default function RegistryDashboard() {
       .filter((log) => log.parsedDate !== null)
       .sort(
         (first, second) =>
-          first.parsedDate!.getTime() -
-          second.parsedDate!.getTime(),
+          second.parsedDate!.getTime() -
+          first.parsedDate!.getTime(),
       );
 
     if (allLogs.length === 0) {
@@ -356,9 +375,7 @@ export default function RegistryDashboard() {
               className="filter-select"
               value={timeFilter}
               onChange={(event) =>
-                setTimeFilter(
-                  event.target.value as TimeFilter,
-                )
+                handleTimeFilterChange(event.target.value)
               }
             >
               <option value="1h">Last 1 hour</option>
@@ -612,7 +629,9 @@ export default function RegistryDashboard() {
 
                         <td>
                           <span className="allowed-badge">
-                            {log.shield_status}
+                            {String(
+                              log.shield_status || "ALLOWED",
+                            ).toUpperCase()}
                           </span>
                         </td>
 
@@ -672,8 +691,17 @@ export default function RegistryDashboard() {
                         </td>
 
                         <td>
-                          <span className="risk-badge">
-                            {log.shield_status}
+                          <span
+                            className={
+                              String(log.shield_status)
+                                .toUpperCase() === "ALLOWED"
+                                ? "allowed-badge"
+                                : "risk-badge"
+                            }
+                          >
+                            {String(
+                              log.shield_status || "UNKNOWN",
+                            ).toUpperCase()}
                           </span>
                         </td>
 

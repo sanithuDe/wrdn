@@ -1,0 +1,81 @@
+WRDN REQUIREMENT DOCUMENT — ADVANCED 01
+Policy type: STAFF DIRECTORY OPEN / PAYROLL LOCKED
+Company: WRDN Demo Company
+Level: Advanced
+
+==================================================
+PURPOSE
+==================================================
+
+Allow normal staff directory questions so employees can
+find colleagues. Strictly lock payroll and identity fields.
+
+==================================================
+RISK SETTINGS
+==================================================
+
+risk_threshold: 62
+embedding_threshold: 0.71
+
+==================================================
+BLOCKED CATEGORIES
+==================================================
+
+- financial_records
+- personal_information
+- employee_information
+- credentials
+- malware
+- illegal_activity
+
+==================================================
+DATABASE RULES
+==================================================
+
+ALLOW:
+- Employees.FullName
+- Employees.Email
+- Employees.RoleName
+- ClientContracts.ClientName
+- ClientContracts.ProjectName
+
+BLOCK:
+- Employees.Salary
+- Employees.PhoneNumber
+- Employees.AddressLine
+- Employees.NationalID
+- CompanySecrets.SecretValue
+- SystemTokens.TokenValue
+- ClientContracts.PaymentAmount
+- ClientContracts.ConfidentialNotes
+
+==================================================
+SENSITIVE PATTERN IDS
+==================================================
+
+- password
+- api_key
+- phone_number
+- sri_lankan_nic
+- bank_account
+
+Do NOT include email_address.
+
+==================================================
+ALLOWED ACTIONS
+==================================================
+
+- ALLOW
+- REDACT
+- BLOCK
+
+==================================================
+BLOCKED RESPONSE
+==================================================
+
+This response was blocked by WRDN directory policy
+because it may expose payroll or private identity data.
+
+==================================================
+END ADVANCED 01
+==================================================

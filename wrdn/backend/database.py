@@ -58,6 +58,60 @@ FALLBACK_EMPLOYEES = [
         "AddressLine": "Negombo",
         "NationalID": "962223334V",
     },
+    {
+        "FullName": "Dilani Wickramasinghe",
+        "Email": "dilani@company.com",
+        "RoleName": "Finance Manager",
+        "Salary": "480000",
+        "PhoneNumber": "0765554433",
+        "AddressLine": "Matara",
+        "NationalID": "905551234V",
+    },
+    {
+        "FullName": "Ruwan Bandara",
+        "Email": "ruwan@company.com",
+        "RoleName": "Sales Executive",
+        "Salary": "220000",
+        "PhoneNumber": "0756677889",
+        "AddressLine": "Kurunegala",
+        "NationalID": "943334455V",
+    },
+    {
+        "FullName": "Ishara Gunasekara",
+        "Email": "ishara@company.com",
+        "RoleName": "QA Engineer",
+        "Salary": "275000",
+        "PhoneNumber": "0709988776",
+        "AddressLine": "Ja-Ela",
+        "NationalID": "967778899V",
+    },
+    {
+        "FullName": "Tharindu Mendis",
+        "Email": "tharindu@company.com",
+        "RoleName": "DevOps Engineer",
+        "Salary": "420000",
+        "PhoneNumber": "0712233445",
+        "AddressLine": "Battaramulla",
+        "NationalID": "928889900V",
+    },
+    {
+        "FullName": "Malsha Peris",
+        "Email": "malsha@company.com",
+        "RoleName": "Customer Support Lead",
+        "Salary": "260000",
+        "PhoneNumber": "0773344556",
+        "AddressLine": "Panadura",
+        "NationalID": "955556677V",
+    },
+    {
+        "FullName": "Chamath Fernando",
+        "Email": "chamath@company.com",
+        "RoleName": "Legal Advisor",
+        "Salary": "390000",
+        "PhoneNumber": "0724455667",
+        "AddressLine": "Nugegoda",
+        "NationalID": "891112233V",
+    },
 ]
 
 
@@ -65,6 +119,16 @@ FALLBACK_SECRETS = [
     {
         "SecretName": "Admin Password",
         "SecretValue": "admin@12345",
+        "RiskLevel": "HIGH",
+    },
+    {
+        "SecretName": "Kasun Account Password",
+        "SecretValue": "kasun@Work2026",
+        "RiskLevel": "HIGH",
+    },
+    {
+        "SecretName": "Dilani Account Password",
+        "SecretValue": "dilani@Finance2026",
         "RiskLevel": "HIGH",
     },
     {
@@ -86,6 +150,21 @@ FALLBACK_SECRETS = [
         "SecretName": "Internal VPN Password",
         "SecretValue": "vpn-company-pass",
         "RiskLevel": "HIGH",
+    },
+    {
+        "SecretName": "Payroll System Password",
+        "SecretValue": "payroll#Secure2026",
+        "RiskLevel": "CRITICAL",
+    },
+    {
+        "SecretName": "Email SMTP Secret",
+        "SecretValue": "smtp-mail-secret-5544",
+        "RiskLevel": "MEDIUM",
+    },
+    {
+        "SecretName": "Backup Encryption Key",
+        "SecretValue": "backup-enc-key-zx91",
+        "RiskLevel": "CRITICAL",
     },
 ]
 
@@ -113,6 +192,28 @@ FALLBACK_CONTRACTS = [
             "Contains confidential banking workflows"
         ),
     },
+    {
+        "ClientName": "Lanka Health Group",
+        "ProjectName": "Secure Triage Chatbot",
+        "PaymentAmount": "$180000",
+        "ContractDetails": (
+            "Staff FAQ chatbot with output sanitization"
+        ),
+        "ConfidentialNotes": (
+            "Must not expose patient identifiers"
+        ),
+    },
+    {
+        "ClientName": "Ceylon Retail PLC",
+        "ProjectName": "Store Support Bot",
+        "PaymentAmount": "$95000",
+        "ContractDetails": (
+            "Customer support assistant for store operations"
+        ),
+        "ConfidentialNotes": (
+            "Discount approval matrix is confidential"
+        ),
+    },
 ]
 
 
@@ -132,6 +233,16 @@ FALLBACK_TOKENS = [
         "TokenValue": "openai-company-token-777",
         "ExpireDate": "2026-12-31",
     },
+    {
+        "TokenName": "GitHub Deploy Token",
+        "TokenValue": "ghp_deploy_token_wrdn_2026",
+        "ExpireDate": "2027-03-15",
+    },
+    {
+        "TokenName": "Monitoring API Token",
+        "TokenValue": "monitor-token-abc-7788",
+        "ExpireDate": "2027-09-01",
+    },
 ]
 
 
@@ -150,6 +261,16 @@ FALLBACK_USER_ROLES = [
         "Username": "employee_user",
         "UserRole": "Employee",
         "AccessLevel": "LOW",
+    },
+    {
+        "Username": "hr_officer",
+        "UserRole": "HR Officer",
+        "AccessLevel": "MEDIUM",
+    },
+    {
+        "Username": "finance_viewer",
+        "UserRole": "Finance Viewer",
+        "AccessLevel": "MEDIUM",
     },
 ]
 
@@ -229,15 +350,21 @@ def initialize_database() -> None:
                 ExpireDate TEXT
             );
 
-            CREATE TABLE IF NOT EXISTS AuditLogs (
-                LogID INTEGER PRIMARY KEY AUTOINCREMENT,
-                UserPrompt TEXT,
-                RawAIOutput TEXT,
-                ShieldStatus TEXT,
-                RiskScore INTEGER,
-                DetectionReason TEXT,
-                CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
-            );
+           CREATE TABLE IF NOT EXISTS AuditLogs (
+    LogID INTEGER PRIMARY KEY AUTOINCREMENT,
+    UserPrompt TEXT,
+    RawAIOutput TEXT,
+    ShieldStatus TEXT,
+    RiskScore INTEGER,
+    DetectionReason TEXT,
+    ClientID TEXT,
+    PolicyID INTEGER,
+    PolicyVersion INTEGER,
+    RequirementFileID INTEGER,
+    DetectionLayer TEXT,
+    MatchedRule TEXT,
+    CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
+);
 
             CREATE TABLE IF NOT EXISTS UserRoles (
                 RoleID INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -291,9 +418,83 @@ CREATE TABLE IF NOT EXISTS SecurityAlerts (
     FOREIGN KEY (RequestID)
         REFERENCES RequirementRequests(RequestID)
 );
+
+CREATE TABLE IF NOT EXISTS Clients (
+    ClientID TEXT PRIMARY KEY,
+    ClientName TEXT NOT NULL,
+    CreatedAt TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS ClientRequirementFiles (
+    RequirementFileID INTEGER PRIMARY KEY AUTOINCREMENT,
+    ClientID TEXT NOT NULL,
+    OriginalFilename TEXT NOT NULL,
+    StoredFilename TEXT NOT NULL,
+    FileType TEXT NOT NULL,
+    FileHash TEXT NOT NULL,
+    ExtractedText TEXT NOT NULL,
+    Status TEXT NOT NULL DEFAULT 'LOADED',
+    UploadedAt TEXT NOT NULL,
+    FOREIGN KEY (ClientID)
+        REFERENCES Clients(ClientID)
+);
+
+CREATE TABLE IF NOT EXISTS ClientPolicies (
+    PolicyID INTEGER PRIMARY KEY AUTOINCREMENT,
+    ClientID TEXT NOT NULL,
+    RequirementFileID INTEGER,
+    PolicyName TEXT NOT NULL,
+    Version INTEGER NOT NULL,
+    PolicyJSON TEXT NOT NULL,
+    Status TEXT NOT NULL DEFAULT 'DRAFT',
+    ValidationErrors TEXT,
+    CreatedAt TEXT NOT NULL,
+    ActivatedAt TEXT,
+    FOREIGN KEY (ClientID)
+        REFERENCES Clients(ClientID),
+    FOREIGN KEY (RequirementFileID)
+        REFERENCES ClientRequirementFiles(RequirementFileID),
+    UNIQUE (ClientID, Version)
+);
+
+CREATE INDEX IF NOT EXISTS idx_client_policies_status
+ON ClientPolicies(ClientID, Status);
+
+CREATE TABLE IF NOT EXISTS Users (
+    UserID INTEGER PRIMARY KEY AUTOINCREMENT,
+    Username TEXT UNIQUE NOT NULL,
+    PasswordHash TEXT NOT NULL,
+    Role TEXT NOT NULL,
+    ClientID TEXT NOT NULL,
+    CreatedAt TEXT NOT NULL,
+    FOREIGN KEY (ClientID)
+        REFERENCES Clients(ClientID)
+);
+
+CREATE INDEX IF NOT EXISTS idx_users_username
+ON Users(Username);
+
+CREATE INDEX IF NOT EXISTS idx_users_client_role
+ON Users(ClientID, Role);
             """
         )
+        
+        for column_name, column_type in {
+            "ClientID": "TEXT",
+            "PolicyID": "INTEGER",
+            "PolicyVersion": "INTEGER",
+            "RequirementFileID": "INTEGER",
+            "DetectionLayer": "TEXT",
+            "MatchedRule": "TEXT",
+        }.items():
+            _ensure_column(
+                cursor,
+                "AuditLogs",
+                column_name,
+                column_type,
+            )
 
+            
         _seed_employees(cursor)
         _seed_secrets(cursor)
         _seed_contracts(cursor)
@@ -322,6 +523,29 @@ CREATE TABLE IF NOT EXISTS SecurityAlerts (
 # SEED FUNCTIONS
 # ==========================================
 
+def _ensure_column(
+    cursor: sqlite3.Cursor,
+    table_name: str,
+    column_name: str,
+    column_type: str,
+) -> None:
+
+    existing_columns = {
+        row["name"]
+        for row in cursor.execute(
+            f"PRAGMA table_info({table_name})"
+        ).fetchall()
+    }
+
+    if column_name not in existing_columns:
+        cursor.execute(
+            f"""
+            ALTER TABLE {table_name}
+            ADD COLUMN {column_name} {column_type}
+            """
+        )
+
+
 def _table_is_empty(
     cursor: sqlite3.Cursor,
     table_name: str,
@@ -338,26 +562,32 @@ def _table_is_empty(
 def _seed_employees(
     cursor: sqlite3.Cursor,
 ) -> None:
-    if not _table_is_empty(
-        cursor,
-        "Employees",
-    ):
-        return
+    for employee in FALLBACK_EMPLOYEES:
+        existing = cursor.execute(
+            """
+            SELECT Email
+            FROM Employees
+            WHERE Email = ?
+            """,
+            (employee["Email"],),
+        ).fetchone()
 
-    cursor.executemany(
-        """
-        INSERT INTO Employees (
-            FullName,
-            Email,
-            RoleName,
-            Salary,
-            PhoneNumber,
-            AddressLine,
-            NationalID
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-        """,
-        [
+        if existing is not None:
+            continue
+
+        cursor.execute(
+            """
+            INSERT INTO Employees (
+                FullName,
+                Email,
+                RoleName,
+                Salary,
+                PhoneNumber,
+                AddressLine,
+                NationalID
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
             (
                 employee["FullName"],
                 employee["Email"],
@@ -366,130 +596,148 @@ def _seed_employees(
                 employee["PhoneNumber"],
                 employee["AddressLine"],
                 employee["NationalID"],
-            )
-            for employee in FALLBACK_EMPLOYEES
-        ],
-    )
+            ),
+        )
 
 
 def _seed_secrets(
     cursor: sqlite3.Cursor,
 ) -> None:
-    if not _table_is_empty(
-        cursor,
-        "CompanySecrets",
-    ):
-        return
+    for secret in FALLBACK_SECRETS:
+        existing = cursor.execute(
+            """
+            SELECT SecretName
+            FROM CompanySecrets
+            WHERE SecretName = ?
+            """,
+            (secret["SecretName"],),
+        ).fetchone()
 
-    cursor.executemany(
-        """
-        INSERT INTO CompanySecrets (
-            SecretName,
-            SecretValue,
-            RiskLevel
-        )
-        VALUES (?, ?, ?)
-        """,
-        [
+        if existing is not None:
+            continue
+
+        cursor.execute(
+            """
+            INSERT INTO CompanySecrets (
+                SecretName,
+                SecretValue,
+                RiskLevel
+            )
+            VALUES (?, ?, ?)
+            """,
             (
                 secret["SecretName"],
                 secret["SecretValue"],
                 secret["RiskLevel"],
-            )
-            for secret in FALLBACK_SECRETS
-        ],
-    )
+            ),
+        )
 
 
 def _seed_contracts(
     cursor: sqlite3.Cursor,
 ) -> None:
-    if not _table_is_empty(
-        cursor,
-        "ClientContracts",
-    ):
-        return
+    for contract in FALLBACK_CONTRACTS:
+        existing = cursor.execute(
+            """
+            SELECT ClientName
+            FROM ClientContracts
+            WHERE ClientName = ?
+              AND ProjectName = ?
+            """,
+            (
+                contract["ClientName"],
+                contract["ProjectName"],
+            ),
+        ).fetchone()
 
-    cursor.executemany(
-        """
-        INSERT INTO ClientContracts (
-            ClientName,
-            ProjectName,
-            PaymentAmount,
-            ContractDetails,
-            ConfidentialNotes
-        )
-        VALUES (?, ?, ?, ?, ?)
-        """,
-        [
+        if existing is not None:
+            continue
+
+        cursor.execute(
+            """
+            INSERT INTO ClientContracts (
+                ClientName,
+                ProjectName,
+                PaymentAmount,
+                ContractDetails,
+                ConfidentialNotes
+            )
+            VALUES (?, ?, ?, ?, ?)
+            """,
             (
                 contract["ClientName"],
                 contract["ProjectName"],
                 contract["PaymentAmount"],
                 contract["ContractDetails"],
                 contract["ConfidentialNotes"],
-            )
-            for contract in FALLBACK_CONTRACTS
-        ],
-    )
+            ),
+        )
 
 
 def _seed_tokens(
     cursor: sqlite3.Cursor,
 ) -> None:
-    if not _table_is_empty(
-        cursor,
-        "SystemTokens",
-    ):
-        return
+    for token in FALLBACK_TOKENS:
+        existing = cursor.execute(
+            """
+            SELECT TokenName
+            FROM SystemTokens
+            WHERE TokenName = ?
+            """,
+            (token["TokenName"],),
+        ).fetchone()
 
-    cursor.executemany(
-        """
-        INSERT INTO SystemTokens (
-            TokenName,
-            TokenValue,
-            ExpireDate
-        )
-        VALUES (?, ?, ?)
-        """,
-        [
+        if existing is not None:
+            continue
+
+        cursor.execute(
+            """
+            INSERT INTO SystemTokens (
+                TokenName,
+                TokenValue,
+                ExpireDate
+            )
+            VALUES (?, ?, ?)
+            """,
             (
                 token["TokenName"],
                 token["TokenValue"],
                 token["ExpireDate"],
-            )
-            for token in FALLBACK_TOKENS
-        ],
-    )
+            ),
+        )
 
 
 def _seed_user_roles(
     cursor: sqlite3.Cursor,
 ) -> None:
-    if not _table_is_empty(
-        cursor,
-        "UserRoles",
-    ):
-        return
+    for role in FALLBACK_USER_ROLES:
+        existing = cursor.execute(
+            """
+            SELECT Username
+            FROM UserRoles
+            WHERE Username = ?
+            """,
+            (role["Username"],),
+        ).fetchone()
 
-    cursor.executemany(
-        """
-        INSERT INTO UserRoles (
-            Username,
-            UserRole,
-            AccessLevel
-        )
-        VALUES (?, ?, ?)
-        """,
-        [
+        if existing is not None:
+            continue
+
+        cursor.execute(
+            """
+            INSERT INTO UserRoles (
+                Username,
+                UserRole,
+                AccessLevel
+            )
+            VALUES (?, ?, ?)
+            """,
             (
                 role["Username"],
                 role["UserRole"],
                 role["AccessLevel"],
-            )
-            for role in FALLBACK_USER_ROLES
-        ],
-    )
+            ),
+        )
 
 
 # ==========================================
@@ -513,7 +761,10 @@ def get_database_context() -> str:
                 FullName,
                 Email,
                 RoleName,
-                Salary
+                Salary,
+                PhoneNumber,
+                AddressLine,
+                NationalID
             FROM Employees
             """
         )
@@ -527,7 +778,10 @@ def get_database_context() -> str:
                 f"Name: {employee['FullName']}, "
                 f"Email: {employee['Email']}, "
                 f"Role: {employee['RoleName']}, "
-                f"Salary: {employee['Salary']}"
+                f"Salary: {employee['Salary']}, "
+                f"Phone: {employee['PhoneNumber']}, "
+                f"Address: {employee['AddressLine']}, "
+                f"NationalID: {employee['NationalID']}"
             )
 
         context_parts.append(
@@ -626,6 +880,174 @@ def get_database_context() -> str:
         connection.close()
 
 
+def find_secret_answer_for_prompt(
+    user_prompt: str,
+) -> str | None:
+    """
+    Match a password/secret/token question to a
+    CompanySecrets or SystemTokens row.
+    """
+
+    matched = match_secret_name_for_prompt(
+        user_prompt
+    )
+
+    if matched is None:
+        return None
+
+    connection = get_connection()
+
+    try:
+        cursor = connection.cursor()
+        row = cursor.execute(
+            """
+            SELECT SecretName, SecretValue
+            FROM CompanySecrets
+            WHERE SecretName = ?
+            """,
+            (matched,),
+        ).fetchone()
+
+        if row is not None:
+            return (
+                f"{row['SecretName']}: "
+                f"{row['SecretValue']}"
+            )
+
+        token_row = cursor.execute(
+            """
+            SELECT TokenName, TokenValue
+            FROM SystemTokens
+            WHERE TokenName = ?
+            """,
+            (matched,),
+        ).fetchone()
+
+        if token_row is not None:
+            return (
+                f"{token_row['TokenName']}: "
+                f"{token_row['TokenValue']}"
+            )
+
+        return None
+    finally:
+        connection.close()
+
+
+def get_employee_salary_by_name(
+    full_name: str,
+) -> str | None:
+    connection = get_connection()
+
+    try:
+        cursor = connection.cursor()
+        row = cursor.execute(
+            """
+            SELECT FullName, Salary, RoleName
+            FROM Employees
+            WHERE lower(FullName) = lower(?)
+            """,
+            (full_name.strip(),),
+        ).fetchone()
+
+        if row is None:
+            return None
+
+        return (
+            f"{row['FullName']} "
+            f"({row['RoleName']}) salary: "
+            f"{row['Salary']}"
+        )
+    finally:
+        connection.close()
+
+
+def match_secret_name_for_prompt(
+    user_prompt: str,
+) -> str | None:
+    """
+    Return the CompanySecrets.SecretName that
+    best matches the user question.
+    """
+
+    text = (user_prompt or "").lower()
+
+    if not text:
+        return None
+
+    secret_aliases: list[tuple[str, tuple[str, ...]]] = [
+        (
+            "Admin Password",
+            (
+                "admin password",
+                "admin pass",
+                "the admin password",
+            ),
+        ),
+        (
+            "Kasun Account Password",
+            (
+                "kasun password",
+                "kasun's password",
+                "kasuns password",
+                "kasun account password",
+                "kasun perera password",
+            ),
+        ),
+        (
+            "Dilani Account Password",
+            (
+                "dilani password",
+                "dilani's password",
+                "dilanis password",
+                "dilani account password",
+                "dilani wickramasinghe password",
+            ),
+        ),
+        (
+            "API Key",
+            (
+                "api key",
+                "the api key",
+            ),
+        ),
+        (
+            "Database Password",
+            (
+                "database password",
+                "db password",
+            ),
+        ),
+        (
+            "AWS Root Key",
+            (
+                "aws root key",
+                "aws root",
+            ),
+        ),
+        (
+            "JWT Token",
+            (
+                "jwt token",
+                "jwt token value",
+            ),
+        ),
+        (
+            "GitHub Deploy Token",
+            (
+                "github deploy token",
+                "github token",
+            ),
+        ),
+    ]
+
+    for secret_name, aliases in secret_aliases:
+        if any(alias in text for alias in aliases):
+            return secret_name
+
+    return None
+
+
 # ==========================================
 # AUDIT LOG
 # ==========================================
@@ -636,9 +1058,15 @@ def save_audit_log(
     shield_status: str,
     risk_score: int,
     detection_reason: str,
+    client_id: str = "default",
+    policy_id: int | None = None,
+    policy_version: int | None = None,
+    requirement_file_id: int | None = None,
+    detection_layer: str | None = None,
+    matched_rule: str | None = None,
 ) -> None:
     """
-    Save WRDN security results into AuditLogs.
+    Save a WRDN security decision and its applied policy.
     """
 
     connection = get_connection()
@@ -653,9 +1081,15 @@ def save_audit_log(
                 RawAIOutput,
                 ShieldStatus,
                 RiskScore,
-                DetectionReason
+                DetectionReason,
+                ClientID,
+                PolicyID,
+                PolicyVersion,
+                RequirementFileID,
+                DetectionLayer,
+                MatchedRule
             )
-            VALUES (?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 user_prompt,
@@ -663,6 +1097,12 @@ def save_audit_log(
                 shield_status,
                 risk_score,
                 detection_reason,
+                client_id,
+                policy_id,
+                policy_version,
+                requirement_file_id,
+                detection_layer,
+                matched_rule,
             ),
         )
 
@@ -680,7 +1120,6 @@ def save_audit_log(
 
     finally:
         connection.close()
-
 
 # ==========================================
 # READ AUDIT LOGS
@@ -712,6 +1151,12 @@ def get_audit_logs(
                 ShieldStatus,
                 RiskScore,
                 DetectionReason,
+                ClientID,
+                PolicyID,
+                PolicyVersion,
+                RequirementFileID,
+                DetectionLayer,
+                MatchedRule,
                 CreatedAt
             FROM AuditLogs
             ORDER BY LogID DESC
@@ -1322,7 +1767,112 @@ def get_security_alerts(
     finally:
         connection.close()
         
-        
+        # ==========================================
+# USERS
+# ==========================================
+
+def create_user(
+    username: str,
+    password_hash: str,
+    role: str,
+    client_id: str,
+) -> int:
+    """
+    Create a user linked to one client.
+    Role must be ADMIN or EMPLOYEE.
+    """
+
+    normalized_role = role.strip().upper()
+
+    if normalized_role not in {"ADMIN", "EMPLOYEE"}:
+        raise ValueError(
+            "Role must be ADMIN or EMPLOYEE."
+        )
+
+    connection = get_connection()
+
+    try:
+        cursor = connection.cursor()
+
+        cursor.execute(
+            """
+            INSERT INTO Users (
+                Username,
+                PasswordHash,
+                Role,
+                ClientID,
+                CreatedAt
+            )
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (
+                username.strip(),
+                password_hash,
+                normalized_role,
+                client_id.strip(),
+                get_current_utc_time(),
+            ),
+        )
+
+        connection.commit()
+
+        if cursor.lastrowid is None:
+            raise RuntimeError(
+                "User ID was not created."
+            )
+
+        return int(cursor.lastrowid)
+
+    except Exception:
+        connection.rollback()
+        logger.exception(
+            "Failed to create user."
+        )
+        raise
+
+    finally:
+        connection.close()
+
+
+def get_user_by_username(
+    username: str,
+) -> dict[str, Any] | None:
+    """
+    Find one user by username.
+    """
+
+    connection = get_connection()
+
+    try:
+        cursor = connection.cursor()
+
+        cursor.execute(
+            """
+            SELECT
+                UserID,
+                Username,
+                PasswordHash,
+                Role,
+                ClientID,
+                CreatedAt
+            FROM Users
+            WHERE Username = ?
+            LIMIT 1
+            """,
+            (username.strip(),),
+        )
+
+        row = cursor.fetchone()
+
+        if row is None:
+            return None
+
+        return dict(row)
+
+    finally:
+        connection.close()
+
 
 # Create the database automatically when this module loads.
 initialize_database()
+
