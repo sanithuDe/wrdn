@@ -127,13 +127,14 @@ export default function Home() {
   useEffect(() => {
     if (
       activeSection === "chat" ||
-      activeSection === "policies"
+      activeSection === "policies" ||
+      activeSection === "hr"
     ) {
       return;
     }
 
     const sectionMap: Record<
-      Exclude<AppSection, "chat" | "policies">,
+      Exclude<AppSection, "chat" | "policies" | "hr">,
       string
     > = {
       dashboard: "overview-section",

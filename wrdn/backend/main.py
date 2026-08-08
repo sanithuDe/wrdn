@@ -44,6 +44,9 @@ from wrdn.backend.routes.policies import (
 from wrdn.backend.routes.auth import (
     router as auth_router,
 )
+from wrdn.backend.routes.hr import (
+    router as hr_router,
+)
 from wrdn.backend.services.policy_judge import (
     judge_output_against_policy,
 )
@@ -86,6 +89,7 @@ app = FastAPI(
 )
 app.include_router(policies_router)
 app.include_router(auth_router)
+app.include_router(hr_router)
 
 # =========================================================
 # CORS

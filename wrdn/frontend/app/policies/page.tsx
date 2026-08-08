@@ -572,6 +572,11 @@ export default function PoliciesPage() {
             return;
           }
 
+          if (section === "hr") {
+            router.push("/hr");
+            return;
+          }
+
           if (section === "chat") {
             router.push("/?section=chat");
             return;

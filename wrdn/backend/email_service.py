@@ -12,7 +12,7 @@ from wrdn.config import (
 
 def validate_email_configuration() -> None:
     """
-    Check whether the Gmail sender settings exist.
+    Check whether the SMTP sender settings exist.
     """
 
     if not MAIL_USERNAME:
@@ -280,7 +280,7 @@ def send_policy_activation_email(
     message = EmailMessage()
 
     message["Subject"] = (
-        f"WRDN: Confirm policy activation — "
+        f"WRDN: Confirm policy activation - "
         f"Client {client_id} (Policy v{policy_version})"
     )
 
@@ -398,3 +398,131 @@ WRDN Security
         raise RuntimeError(
             f"Policy activation email failed: {error}"
         ) from error
+
+
+def send_hr_candidate_email(
+    candidate_email: str,
+    subject: str,
+    body: str,
+    delivery_email: str | None = None,
+    shield_status: str = "ALLOWED",
+    candidate_name: str = "Candidate",
+) -> dict[str, str]:
+    """
+    Send the HR outbound candidate email through the
+    configured Mailtrap / SMTP connection.
+
+    When delivery_email is set (usually POLICY_APPROVAL_EMAIL),
+    deliver there so the message appears in the demo inbox,
+    while still recording the intended candidate address.
+    """
+
+    validate_email_configuration()
+
+    intended_to = (candidate_email or "").strip()
+    inbox = (delivery_email or "").strip() or intended_to
+
+    if not inbox:
+        raise RuntimeError(
+            "No recipient available for HR candidate email."
+        )
+
+    message = EmailMessage()
+    message["Subject"] = subject or "Your application update"
+    message["From"] = (
+        f"{MAIL_FROM_NAME} <{MAIL_USERNAME}>"
+    )
+    message["To"] = inbox
+
+    if intended_to and intended_to.lower() != inbox.lower():
+        message["X-WRDN-Intended-Recipient"] = intended_to
+        message["Reply-To"] = intended_to
+
+    redirect_note = ""
+    if intended_to and intended_to.lower() != inbox.lower():
+        redirect_note = (
+            "\n[WRDN demo delivery] Intended candidate: "
+            f"{intended_to}\n"
+            f"Delivered to Mailtrap inbox: {inbox}\n"
+            f"Shield status: {shield_status}\n"
+        )
+
+    text_content = f"""{redirect_note}
+{body}
+
+---
+Sent by WRDN HR Candidate Processor
+Shield: {shield_status}
+""".strip()
+
+    safe_body_html = (
+        body.replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace("\n", "<br>")
+    )
+
+    redirect_html = ""
+    if redirect_note:
+        redirect_html = f"""
+        <div style="margin-bottom: 16px; padding: 12px; background: #f8fafc; border-radius: 8px; font-size: 13px; color: #334155;">
+            <strong>WRDN demo delivery</strong><br>
+            Intended candidate: {intended_to}<br>
+            Delivered to Mailtrap inbox: {inbox}<br>
+            Shield status: {shield_status}
+        </div>
+        """
+
+    html_content = f"""
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"></head>
+<body style="font-family: Arial, sans-serif; background: #f4f6f8; padding: 24px;">
+  <div style="max-width: 640px; margin: auto; background: white; border-radius: 10px; padding: 24px; border: 1px solid #dddddd;">
+    <h2 style="margin-top: 0;">WRDN HR Candidate Email</h2>
+    {redirect_html}
+    <p style="color: #64748b; font-size: 12px; text-transform: uppercase;">Message to {candidate_name}</p>
+    <div style="line-height: 1.5; color: #0f172a;">{safe_body_html}</div>
+    <p style="margin-top: 24px; font-size: 12px; color: #64748b;">
+      Sent by WRDN HR Candidate Processor | Shield: {shield_status}
+    </p>
+  </div>
+</body>
+</html>
+""".strip()
+
+    message.set_content(text_content)
+    message.add_alternative(html_content, subtype="html")
+
+    try:
+        with smtplib.SMTP(
+            SMTP_HOST,
+            SMTP_PORT,
+            timeout=30,
+        ) as smtp_server:
+            smtp_server.ehlo()
+            smtp_server.starttls()
+            smtp_server.ehlo()
+            smtp_server.login(
+                MAIL_USERNAME,
+                MAIL_APP_PASSWORD,
+            )
+            smtp_server.send_message(message)
+
+    except smtplib.SMTPAuthenticationError as error:
+        raise RuntimeError(
+            "SMTP authentication failed. "
+            "Check MAIL_USERNAME and MAIL_APP_PASSWORD."
+        ) from error
+
+    except Exception as error:
+        raise RuntimeError(
+            f"HR candidate email failed: {error}"
+        ) from error
+
+    return {
+        "intended_to": intended_to,
+        "delivered_to": inbox,
+        "subject": subject or "Your application update",
+        "status": "sent",
+    }

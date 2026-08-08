@@ -356,3 +356,122 @@ export async function setProtectionStatus(
     },
   );
 }
+
+export type HrSampleCv = {
+  id: string;
+  label: string;
+  description: string;
+  cv_text: string;
+};
+
+export type HrSampleCvsResponse = {
+  safe: HrSampleCv;
+  attack: HrSampleCv;
+};
+
+export type HrProcessResult = {
+  client_id: string;
+  protection_enabled: boolean;
+  target_role: string;
+  agent_1: {
+    name: string;
+    evaluation: Record<string, unknown>;
+  };
+  agent_2: {
+    name: string;
+    email: {
+      to: string;
+      subject: string;
+      body_raw: string;
+      body_final: string;
+    };
+  };
+  shield: {
+    status: string;
+    risk_score: number;
+    reason: string;
+    leak_detected: boolean;
+    leak_findings: string[];
+    layer: string;
+  };
+  email_dispatched: boolean;
+  email_send?: {
+    attempted: boolean;
+    sent: boolean;
+    status: string;
+    message: string;
+    intended_to: string;
+    delivered_to: string;
+    subject?: string;
+  };
+  demo_hint: string;
+};
+
+export async function getHrSampleCvs(): Promise<HrSampleCvsResponse> {
+  return apiFetch<HrSampleCvsResponse>(
+    "/api/hr/sample-cvs",
+  );
+}
+
+export async function processHrCv(input: {
+  cvText: string;
+  clientId: string;
+  targetRole?: string;
+}): Promise<HrProcessResult> {
+  return apiFetch<HrProcessResult>(
+    "/api/hr/process-cv",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        cv_text: input.cvText,
+        client_id: input.clientId,
+        target_role:
+          input.targetRole || "Software Engineer",
+      }),
+    },
+  );
+}
+
+export type HrExtractCvResponse = {
+  filename: string;
+  file_type: string;
+  cv_text: string;
+  character_count: number;
+};
+
+export async function extractHrCv(
+  file: File,
+): Promise<HrExtractCvResponse> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  return apiFetch<HrExtractCvResponse>(
+    "/api/hr/extract-cv",
+    {
+      method: "POST",
+      body: formData,
+    },
+  );
+}
+
+export async function processHrCvUpload(input: {
+  file: File;
+  clientId: string;
+  targetRole?: string;
+}): Promise<HrProcessResult> {
+  const formData = new FormData();
+  formData.append("file", input.file);
+  formData.append("client_id", input.clientId);
+  formData.append(
+    "target_role",
+    input.targetRole || "Software Engineer",
+  );
+
+  return apiFetch<HrProcessResult>(
+    "/api/hr/process-cv-upload",
+    {
+      method: "POST",
+      body: formData,
+    },
+  );
+}

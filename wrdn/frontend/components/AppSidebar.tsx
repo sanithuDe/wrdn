@@ -4,6 +4,7 @@ import Link from "next/link";
 export type AppSection =
   | "chat"
   | "policies"
+  | "hr"
   | "dashboard"
   | "live-registry"
   | "allowed"
@@ -74,6 +75,15 @@ export default function AppSidebar({
               Policy Upload
             </Link>
           )}
+
+          <Link
+            href="/hr"
+            className={`nav-link ${
+              activeSection === "hr" ? "active" : ""
+            }`}
+          >
+            HR Candidates
+          </Link>
 
           <Link
             href="/?section=dashboard"
