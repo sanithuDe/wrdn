@@ -128,6 +128,9 @@ export type PolicyActivationResponse = {
   policy_id: number;
   client_id: string;
   status: string;
+  approval_email?: string;
+  expires_at?: string;
+  message?: string;
 };
 
 export type PolicyHistoryItem = {
@@ -227,13 +230,45 @@ export async function activatePolicy(
   clientId: string,
 ): Promise<PolicyActivationResponse> {
   return apiFetch<PolicyActivationResponse>(
-    `/api/admin/policies/${policyId}/activate`,
+    `/api/admin/policies/${policyId}/request-activation`,
     {
       method: "POST",
       body: JSON.stringify({
         client_id: clientId,
       }),
     },
+  );
+}
+
+export async function requestPolicyActivation(
+  policyId: number,
+  clientId: string,
+): Promise<PolicyActivationResponse> {
+  return activatePolicy(policyId, clientId);
+}
+
+export async function confirmPolicyActivation(
+  token: string,
+): Promise<PolicyActivationResponse & {
+  confirmed_at_display?: string;
+  activated_at_display?: string;
+}> {
+  return apiFetch(
+    `/api/admin/policies/confirm-activation?token=${encodeURIComponent(
+      token,
+    )}&format=json`,
+  );
+}
+
+export async function rejectPolicyActivation(
+  token: string,
+): Promise<PolicyActivationResponse & {
+  rejected_at_display?: string;
+}> {
+  return apiFetch(
+    `/api/admin/policies/reject-activation?token=${encodeURIComponent(
+      token,
+    )}&format=json`,
   );
 }
 
@@ -284,6 +319,39 @@ export async function deletePolicy(
       method: "DELETE",
       body: JSON.stringify({
         client_id: clientId,
+      }),
+    },
+  );
+}
+
+export type ProtectionStatusResponse = {
+  client_id: string;
+  protection_enabled: boolean;
+  status: string;
+  message: string;
+};
+
+export async function getProtectionStatus(
+  clientId: string,
+): Promise<ProtectionStatusResponse> {
+  return apiFetch<ProtectionStatusResponse>(
+    `/api/protection-status?client_id=${encodeURIComponent(
+      clientId.trim(),
+    )}`,
+  );
+}
+
+export async function setProtectionStatus(
+  clientId: string,
+  enabled: boolean,
+): Promise<ProtectionStatusResponse> {
+  return apiFetch<ProtectionStatusResponse>(
+    "/api/admin/protection-status",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        client_id: clientId,
+        enabled,
       }),
     },
   );

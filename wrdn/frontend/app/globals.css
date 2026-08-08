@@ -694,6 +694,11 @@ button {
   background: rgba(255, 202, 85, 0.13);
 }
 
+.shield-badge.bypassed {
+  color: #fbbf24;
+  background: rgba(251, 191, 36, 0.14);
+}
+
 .security-details {
   margin-top: 17px;
   display: grid;
@@ -1125,6 +1130,58 @@ td {
 .setting-row strong {
   color: #ffffff;
   font-weight: 700;
+}
+
+.protection-setting-row {
+  align-items: flex-start;
+}
+
+.protection-setting-help {
+  margin: 6px 0 0;
+  max-width: 420px;
+  color: #7d8590;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.protection-setting-message {
+  margin: 8px 0 0;
+  color: #94a3b8;
+  font-size: 11px;
+}
+
+.protection-toggle-button {
+  flex-shrink: 0;
+  padding: 10px 14px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.protection-toggle-button.enabled {
+  color: #05070c;
+  background: #20e487;
+}
+
+.protection-toggle-button.disabled {
+  color: #05070c;
+  background: #fbbf24;
+}
+
+.protection-toggle-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.chat-header-status.protection-off {
+  color: #fbbf24;
+}
+
+.chat-header-status.protection-off .protection-dot {
+  background: #fbbf24;
+  box-shadow: 0 0 13px #fbbf24;
 }
 
 .filter-select {

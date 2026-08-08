@@ -166,6 +166,122 @@ export default function PoliciesPage() {
     };
   }, [checkingAuth, clientId]);
 
+  useEffect(() => {
+    function applyActivationResult(
+      payload?: {
+        status?: string;
+        policy_id?: number;
+      } | null,
+    ) {
+      let data = payload;
+
+      if (!data) {
+        const raw = localStorage.getItem(
+          "wrdn_policy_activation_result",
+        );
+
+        if (!raw) {
+          return;
+        }
+
+        try {
+          data = JSON.parse(raw) as {
+            status?: string;
+            policy_id?: number;
+          };
+        } catch {
+          localStorage.removeItem(
+            "wrdn_policy_activation_result",
+          );
+          return;
+        }
+      }
+
+      localStorage.removeItem(
+        "wrdn_policy_activation_result",
+      );
+
+      setGeneratedPolicy((current) =>
+        current &&
+        data?.policy_id &&
+        current.policy_id === data.policy_id
+          ? {
+              ...current,
+              status: data.status || current.status,
+            }
+          : current,
+      );
+
+      setNotice({
+        type:
+          data?.status === "ACTIVE" ? "success" : "info",
+        message:
+          data?.status === "ACTIVE"
+            ? "Policy activated from email confirmation."
+            : "Activation was rejected from email.",
+      });
+
+      if (clientId.trim()) {
+        void listPolicies(clientId.trim()).then(
+          (result) => {
+            setPolicyHistory(result);
+            setActiveStep(4);
+            setCompletedStep(4);
+          },
+        );
+      }
+    }
+
+    applyActivationResult();
+
+    function onStorage(event: StorageEvent) {
+      if (event.key === "wrdn_policy_activation_result") {
+        applyActivationResult();
+      }
+    }
+
+    let channel: BroadcastChannel | null = null;
+
+    try {
+      channel = new BroadcastChannel(
+        "wrdn-policy-activation",
+      );
+      channel.onmessage = (event) => {
+        const message = event.data as {
+          type?: string;
+          status?: string;
+          policy_id?: number;
+        };
+
+        if (message?.type === "FOCUS_POLICY_PAGE") {
+          window.focus();
+          return;
+        }
+
+        if (message?.status && message?.policy_id) {
+          applyActivationResult(message);
+          window.focus();
+        }
+      };
+    } catch {
+      channel = null;
+    }
+
+    window.addEventListener("storage", onStorage);
+
+    function onFocus() {
+      applyActivationResult();
+    }
+
+    window.addEventListener("focus", onFocus);
+
+    return () => {
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener("focus", onFocus);
+      channel?.close();
+    };
+  }, [clientId]);
+
   function showError(error: unknown) {
     setNotice({
       type: "error",
@@ -338,10 +454,11 @@ export default function PoliciesPage() {
 
       setNotice({
         type: "success",
-        message: "Policy activated successfully.",
+        message:
+          result.message ||
+          "Confirmation email sent. Open Mailtrap and confirm to activate.",
       });
 
-      completeStep(3, 4);
       await loadHistory();
     } catch (error) {
       showError(error);
@@ -639,7 +756,7 @@ export default function PoliciesPage() {
                       <StepHeader
                         number="03"
                         title="Validate and activate"
-                        description="Check the generated policy before activating it."
+                        description="Validate the policy, then request email confirmation before it goes live."
                       />
 
                       {!generatedPolicy ? (
@@ -683,6 +800,16 @@ export default function PoliciesPage() {
                             </div>
                           )}
 
+                          {generatedPolicy.status ===
+                            "PENDING_ACTIVATION" && (
+                            <div className="pending-activation-box">
+                              Waiting for email confirmation.
+                              Open your Mailtrap inbox and click
+                              Confirm Activation. The policy is
+                              not live yet.
+                            </div>
+                          )}
+
                           <div className="actions">
                             <SecondaryButton
                               text="Back"
@@ -705,14 +832,19 @@ export default function PoliciesPage() {
                               className="primary-button"
                               onClick={handleActivate}
                               disabled={
-                                generatedPolicy.status !==
-                                  "VALIDATED" ||
+                                (generatedPolicy.status !==
+                                  "VALIDATED" &&
+                                  generatedPolicy.status !==
+                                    "PENDING_ACTIVATION") ||
                                 busyAction === "activate"
                               }
                             >
                               {busyAction === "activate"
-                                ? "Activating..."
-                                : "Approve and Activate"}
+                                ? "Sending email..."
+                                : generatedPolicy.status ===
+                                    "PENDING_ACTIVATION"
+                                  ? "Resend Confirmation Email"
+                                  : "Request Activation"}
                             </button>
                           </div>
                         </div>
@@ -781,6 +913,18 @@ export default function PoliciesPage() {
                                       {details?.risk_threshold != null
                                         ? ` · Risk ${details.risk_threshold}`
                                         : ""}
+                                    </p>
+
+                                    <p className="history-timestamps">
+                                      Created:{" "}
+                                      {formatPolicyDateTime(
+                                        policy.CreatedAt,
+                                      )}
+                                      {" · "}
+                                      Activated:{" "}
+                                      {formatPolicyDateTime(
+                                        policy.ActivatedAt,
+                                      )}
                                     </p>
                                   </div>
 
@@ -1016,10 +1160,10 @@ export default function PoliciesPage() {
                 <div className="security-note">
                   <span>🛡</span>
                   <div>
-                    <strong>Manual activation</strong>
+                    <strong>Email confirmation required</strong>
                     <p>
-                      Gemini-generated policies never activate
-                      automatically.
+                      Policies go live only after the admin
+                      confirms from the Mailtrap email link.
                     </p>
                   </div>
                 </div>
@@ -1590,6 +1734,22 @@ export default function PoliciesPage() {
               background: #14532d;
             }
 
+            .status-badge.pending_activation {
+              color: #fde68a;
+              background: #92400e;
+            }
+
+            .pending-activation-box {
+              margin: 12px 0;
+              padding: 12px 14px;
+              border: 1px solid rgba(251, 191, 36, 0.35);
+              border-radius: 12px;
+              color: #fde68a;
+              background: rgba(146, 64, 14, 0.25);
+              font-size: 13px;
+              line-height: 1.45;
+            }
+
             .status-badge.inactive {
               color: #ddd6fe;
               background: #4c1d95;
@@ -1634,6 +1794,13 @@ export default function PoliciesPage() {
               margin: 4px 0 0;
               color: #64748b;
               font-size: 11px;
+            }
+
+            .history-timestamps {
+              margin-top: 6px !important;
+              color: #94a3b8 !important;
+              font-size: 11px !important;
+              line-height: 1.45;
             }
 
             .history-details {
@@ -1902,6 +2069,35 @@ function StatusBadge({ status }: { status: string }) {
       {status}
     </span>
   );
+}
+
+function formatPolicyDateTime(
+  value?: string | null,
+): string {
+  if (!value) {
+    return "—";
+  }
+
+  const date = new Date(
+    value.includes("T") || value.endsWith("Z")
+      ? value
+      : `${value.replace(" ", "T")}Z`,
+  );
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return date.toLocaleString("en-LK", {
+    timeZone: "Asia/Colombo",
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: true,
+  });
 }
 
 function EmptyState({ text }: { text: string }) {

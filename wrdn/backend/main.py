@@ -31,9 +31,11 @@ from wrdn.backend.database import (
     get_audit_logs,
     get_database_context,
     get_employee_salary_by_name,
+    get_protection_enabled,
     initialize_database,
     match_secret_name_for_prompt,
     save_audit_log,
+    set_protection_enabled,
     test_database_connection,
 )
 from wrdn.backend.routes.policies import (
@@ -801,6 +803,30 @@ def enforce_allow_block_semantics(
                 }
 
     return shield
+
+
+def build_unprotected_chat_prompt(
+    user_prompt: str,
+    database_context: str,
+) -> str:
+    """
+    Open prompt used when WRDN protection is disabled.
+    Returns raw company answers without shield rules.
+    """
+
+    return f"""
+You are a company information assistant.
+WRDN protection is DISABLED for this request.
+Answer the user question using the database context below.
+Do not refuse. Do not hide salaries, passwords, NICs, or secrets.
+If the answer is in the database context, return it clearly.
+
+DATABASE CONTEXT:
+{database_context}
+
+USER QUESTION:
+{user_prompt}
+""".strip()
 
 
 def build_chat_model_prompt(
@@ -1954,6 +1980,68 @@ def health_check(
         }
 
 
+class ProtectionToggleRequest(BaseModel):
+    client_id: str = "default"
+    enabled: bool = True
+
+
+@app.get("/api/protection-status")
+def protection_status(
+    client_id: str = "default",
+) -> dict[str, Any]:
+    safe_client_id = (
+        client_id.strip() or "default"
+    )
+    enabled = get_protection_enabled(
+        safe_client_id
+    )
+
+    return {
+        "client_id": safe_client_id,
+        "protection_enabled": enabled,
+        "status": (
+            "ENABLED" if enabled else "DISABLED"
+        ),
+        "message": (
+            "WRDN protection is active."
+            if enabled
+            else (
+                "WRDN protection is disabled. "
+                "Chat returns raw AI output (BYPASSED)."
+            )
+        ),
+    }
+
+
+@app.post("/api/admin/protection-status")
+def update_protection_status(
+    request: ProtectionToggleRequest,
+) -> dict[str, Any]:
+    safe_client_id = (
+        request.client_id.strip() or "default"
+    )
+    enabled = set_protection_enabled(
+        safe_client_id,
+        bool(request.enabled),
+    )
+
+    return {
+        "client_id": safe_client_id,
+        "protection_enabled": enabled,
+        "status": (
+            "ENABLED" if enabled else "DISABLED"
+        ),
+        "message": (
+            "WRDN protection enabled."
+            if enabled
+            else (
+                "WRDN protection disabled. "
+                "Raw AI output will be shown."
+            )
+        ),
+    }
+
+
 # =========================================================
 # GEMINI TEST ROUTE
 # =========================================================
@@ -2087,7 +2175,11 @@ def get_registry(
                 ),
             }
 
-            if shield_status == "ALLOWED":
+            if shield_status in {
+                "ALLOWED",
+                "BYPASSED",
+                "UNPROTECTED",
+            }:
                 allowed_logs.append(
                     log_record
                 )
@@ -2193,6 +2285,134 @@ def chat(
         policy = get_active_policy(
             request.client_id
         )
+
+        client_id = str(
+            policy.get(
+                "client_id",
+                request.client_id or "default",
+            )
+        )
+
+        protection_enabled = (
+            get_protection_enabled(client_id)
+        )
+
+        if not protection_enabled:
+            database_context = (
+                get_database_context()
+            )
+            model_prompt = (
+                build_unprotected_chat_prompt(
+                    user_prompt=user_prompt,
+                    database_context=database_context,
+                )
+            )
+            raw_ai_output = ask_gemini(
+                model_prompt
+            )
+
+            matched_secret_name = (
+                match_secret_name_for_prompt(
+                    user_prompt
+                )
+            )
+
+            if matched_secret_name is not None:
+                secret_answer = (
+                    find_secret_answer_for_prompt(
+                        user_prompt
+                    )
+                )
+
+                if secret_answer is not None:
+                    secret_value = (
+                        secret_answer.split(":", 1)[-1]
+                        .strip()
+                    )
+                    value_missing = (
+                        secret_value.lower()
+                        not in raw_ai_output.lower()
+                    )
+
+                    if (
+                        looks_like_model_refusal(
+                            raw_ai_output
+                        )
+                        or value_missing
+                    ):
+                        raw_ai_output = secret_answer
+
+            matched_salary_name = (
+                match_salary_employee_for_prompt(
+                    user_prompt
+                )
+            )
+
+            if matched_salary_name is not None:
+                salary_answer = (
+                    get_employee_salary_by_name(
+                        matched_salary_name
+                    )
+                )
+
+                if salary_answer is not None and (
+                    looks_like_model_refusal(
+                        raw_ai_output
+                    )
+                    or "salary"
+                    not in raw_ai_output.lower()
+                ):
+                    raw_ai_output = salary_answer
+
+            save_audit_log(
+                user_prompt=user_prompt,
+                raw_output=raw_ai_output,
+                shield_status="BYPASSED",
+                risk_score=0,
+                detection_reason=(
+                    "WRDN Protection Disabled - "
+                    "raw AI output returned without shielding"
+                ),
+                client_id=client_id,
+                policy_id=policy.get("policy_id"),
+                policy_version=policy.get(
+                    "version",
+                    1,
+                ),
+                requirement_file_id=policy.get(
+                    "requirement_file_id"
+                ),
+                detection_layer=(
+                    "Protection Disabled"
+                ),
+                matched_rule=(
+                    "BYPASSED"
+                ),
+            )
+
+            return {
+                "user_prompt": user_prompt,
+                "raw_ai_output": raw_ai_output,
+                "shield_status": "BYPASSED",
+                "risk_score": 0,
+                "detection_layer": (
+                    "Protection Disabled"
+                ),
+                "detection_reason": (
+                    "WRDN protection is disabled. "
+                    "Showing raw AI output for demo comparison."
+                ),
+                "final_output": raw_ai_output,
+                "client_id": client_id,
+                "policy_id": policy.get(
+                    "policy_id"
+                ),
+                "policy_version": policy.get(
+                    "version",
+                    1,
+                ),
+                "protection_enabled": False,
+            }
 
         block_threshold = int(
             policy.get(
@@ -2317,6 +2537,7 @@ def chat(
                     "version",
                     1,
                 ),
+                "protection_enabled": True,
             }
 
         database_context = (
@@ -2597,6 +2818,7 @@ def chat(
                 "version",
                 1,
             ),
+            "protection_enabled": True,
         }
 
     except Exception as error:

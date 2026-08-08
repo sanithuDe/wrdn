@@ -46,3 +46,9 @@ wrdn/backend/secure_uploads/*
 !wrdn/backend/secure_uploads/approved/
 !wrdn/backend/secure_uploads/rejected/
 !wrdn/backend/secure_uploads/expired/
+
+wrdn.zip
+*.zip
+frontend-build.log
+__pycache__/
+*.pyc

@@ -104,3 +104,25 @@ MAX_REQUIREMENT_FILE_SIZE_BYTES = (
     * 1024
     * 1024
 )
+
+
+# =========================================================
+# POLICY ACTIVATION EMAIL CONFIRMATION
+# =========================================================
+
+POLICY_APPROVAL_EMAIL = os.getenv(
+    "POLICY_APPROVAL_EMAIL",
+    "",
+).strip()
+
+POLICY_APPROVAL_NAME = os.getenv(
+    "POLICY_APPROVAL_NAME",
+    "Admin",
+).strip()
+
+POLICY_ACTIVATION_EXPIRE_MINUTES = int(
+    os.getenv(
+        "POLICY_ACTIVATION_EXPIRE_MINUTES",
+        "60",
+    )
+)

@@ -15,6 +15,7 @@ export interface ChatApiResponse {
   client_id?: string;
   policy_id?: number;
   policy_version?: number;
+  protection_enabled?: boolean;
   status?: string;
   error?: string;
 }

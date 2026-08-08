@@ -460,6 +460,33 @@ CREATE TABLE IF NOT EXISTS ClientPolicies (
 CREATE INDEX IF NOT EXISTS idx_client_policies_status
 ON ClientPolicies(ClientID, Status);
 
+CREATE TABLE IF NOT EXISTS PolicyActivationRequests (
+    RequestID INTEGER PRIMARY KEY AUTOINCREMENT,
+    PolicyID INTEGER NOT NULL,
+    ClientID TEXT NOT NULL,
+    RequestedBy TEXT NOT NULL,
+    ApprovalEmail TEXT NOT NULL,
+    ConfirmTokenHash TEXT NOT NULL,
+    RejectTokenHash TEXT NOT NULL,
+    Status TEXT NOT NULL DEFAULT 'PENDING',
+    ExpiresAt TEXT NOT NULL,
+    CreatedAt TEXT NOT NULL,
+    ProcessedAt TEXT,
+    FOREIGN KEY (PolicyID)
+        REFERENCES ClientPolicies(PolicyID),
+    FOREIGN KEY (ClientID)
+        REFERENCES Clients(ClientID)
+);
+
+CREATE INDEX IF NOT EXISTS idx_policy_activation_confirm
+ON PolicyActivationRequests(ConfirmTokenHash);
+
+CREATE INDEX IF NOT EXISTS idx_policy_activation_reject
+ON PolicyActivationRequests(RejectTokenHash);
+
+CREATE INDEX IF NOT EXISTS idx_policy_activation_policy
+ON PolicyActivationRequests(PolicyID, Status);
+
 CREATE TABLE IF NOT EXISTS Users (
     UserID INTEGER PRIMARY KEY AUTOINCREMENT,
     Username TEXT UNIQUE NOT NULL,
@@ -493,6 +520,13 @@ ON Users(ClientID, Role);
                 column_name,
                 column_type,
             )
+
+        _ensure_column(
+            cursor,
+            "Clients",
+            "ProtectionEnabled",
+            "INTEGER NOT NULL DEFAULT 1",
+        )
 
             
         _seed_employees(cursor)
@@ -1868,6 +1902,260 @@ def get_user_by_username(
             return None
 
         return dict(row)
+
+    finally:
+        connection.close()
+
+
+def create_policy_activation_request(
+    policy_id: int,
+    client_id: str,
+    requested_by: str,
+    approval_email: str,
+    confirm_token_hash: str,
+    reject_token_hash: str,
+    expires_at: str,
+) -> int:
+    connection = get_connection()
+
+    try:
+        cursor = connection.cursor()
+
+        cursor.execute(
+            """
+            INSERT INTO PolicyActivationRequests (
+                PolicyID,
+                ClientID,
+                RequestedBy,
+                ApprovalEmail,
+                ConfirmTokenHash,
+                RejectTokenHash,
+                Status,
+                ExpiresAt,
+                CreatedAt
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                policy_id,
+                client_id,
+                requested_by,
+                approval_email,
+                confirm_token_hash,
+                reject_token_hash,
+                "PENDING",
+                expires_at,
+                get_current_utc_time(),
+            ),
+        )
+
+        connection.commit()
+
+        if cursor.lastrowid is None:
+            raise RuntimeError(
+                "Activation request was not created."
+            )
+
+        return int(cursor.lastrowid)
+
+    except Exception:
+        connection.rollback()
+        logger.exception(
+            "Failed to create policy activation request."
+        )
+        raise
+
+    finally:
+        connection.close()
+
+
+def get_policy_activation_by_token(
+    token_hash: str,
+    token_type: str,
+) -> dict | None:
+    column = (
+        "ConfirmTokenHash"
+        if token_type == "confirm"
+        else "RejectTokenHash"
+    )
+
+    connection = get_connection()
+
+    try:
+        row = connection.execute(
+            f"""
+            SELECT *
+            FROM PolicyActivationRequests
+            WHERE {column} = ?
+              AND Status = 'PENDING'
+            ORDER BY RequestID DESC
+            LIMIT 1
+            """,
+            (token_hash,),
+        ).fetchone()
+
+        if row is None:
+            return None
+
+        return dict(row)
+
+    finally:
+        connection.close()
+
+
+def update_policy_activation_request(
+    request_id: int,
+    status: str,
+) -> None:
+    connection = get_connection()
+
+    try:
+        connection.execute(
+            """
+            UPDATE PolicyActivationRequests
+            SET
+                Status = ?,
+                ProcessedAt = ?
+            WHERE RequestID = ?
+            """,
+            (
+                status,
+                get_current_utc_time(),
+                request_id,
+            ),
+        )
+        connection.commit()
+
+    except Exception:
+        connection.rollback()
+        raise
+
+    finally:
+        connection.close()
+
+
+def cancel_pending_policy_activation(
+    policy_id: int,
+) -> None:
+    connection = get_connection()
+
+    try:
+        connection.execute(
+            """
+            UPDATE PolicyActivationRequests
+            SET
+                Status = 'CANCELLED',
+                ProcessedAt = ?
+            WHERE PolicyID = ?
+              AND Status = 'PENDING'
+            """,
+            (
+                get_current_utc_time(),
+                policy_id,
+            ),
+        )
+        connection.commit()
+
+    except Exception:
+        connection.rollback()
+        raise
+
+    finally:
+        connection.close()
+
+
+def get_protection_enabled(
+    client_id: str = "default",
+) -> bool:
+    """
+    Return whether WRDN protection is enabled
+    for a client. Default is enabled.
+    """
+
+    connection = get_connection()
+
+    try:
+        row = connection.execute(
+            """
+            SELECT ProtectionEnabled
+            FROM Clients
+            WHERE ClientID = ?
+            LIMIT 1
+            """,
+            (client_id.strip(),),
+        ).fetchone()
+
+        if row is None:
+            return True
+
+        value = row["ProtectionEnabled"]
+
+        if value is None:
+            return True
+
+        return int(value) == 1
+
+    finally:
+        connection.close()
+
+
+def set_protection_enabled(
+    client_id: str,
+    enabled: bool,
+) -> bool:
+    """
+    Enable or disable WRDN protection for a client.
+    """
+
+    connection = get_connection()
+
+    try:
+        existing = connection.execute(
+            """
+            SELECT ClientID
+            FROM Clients
+            WHERE ClientID = ?
+            """,
+            (client_id.strip(),),
+        ).fetchone()
+
+        if existing is None:
+            connection.execute(
+                """
+                INSERT INTO Clients (
+                    ClientID,
+                    ClientName,
+                    CreatedAt,
+                    ProtectionEnabled
+                )
+                VALUES (?, ?, ?, ?)
+                """,
+                (
+                    client_id.strip(),
+                    client_id.strip(),
+                    get_current_utc_time(),
+                    1 if enabled else 0,
+                ),
+            )
+        else:
+            connection.execute(
+                """
+                UPDATE Clients
+                SET ProtectionEnabled = ?
+                WHERE ClientID = ?
+                """,
+                (
+                    1 if enabled else 0,
+                    client_id.strip(),
+                ),
+            )
+
+        connection.commit()
+        return enabled
+
+    except Exception:
+        connection.rollback()
+        raise
 
     finally:
         connection.close()

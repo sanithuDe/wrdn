@@ -81,6 +81,8 @@ export default function ChatInterface({
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
   const [clientId, setClientId] = useState("");
+  const [protectionEnabled, setProtectionEnabled] =
+    useState(true);
   const [sessionId, setSessionId] = useState(
     () => createChatSessionId(),
   );
@@ -212,6 +214,40 @@ export default function ChatInterface({
     setClientId(user.client_id);
   }, []);
 
+  useEffect(() => {
+    if (!clientId.trim()) {
+      return;
+    }
+
+    let cancelled = false;
+
+    void fetch(
+      `${
+        process.env.NEXT_PUBLIC_API_URL?.replace(
+          /\/$/,
+          "",
+        ) || "http://localhost:18000"
+      }/api/protection-status?client_id=${encodeURIComponent(
+        clientId.trim(),
+      )}`,
+    )
+      .then(async (response) => {
+        const data = await response.json();
+        if (!cancelled && response.ok) {
+          setProtectionEnabled(
+            Boolean(data.protection_enabled),
+          );
+        }
+      })
+      .catch(() => {
+        // Keep default enabled.
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [clientId]);
+
   async function submitMessage(
     promptOverride?: string,
   ) {
@@ -251,6 +287,10 @@ export default function ChatInterface({
         prompt,
         clientId.trim(),
       );
+
+      if (typeof data.protection_enabled === "boolean") {
+        setProtectionEnabled(data.protection_enabled);
+      }
 
       const assistantMessage: ChatMessage = {
         id: createMessageId(),
@@ -333,6 +373,13 @@ export default function ChatInterface({
       return "sanitized";
     }
 
+    if (
+      normalized === "BYPASSED" ||
+      normalized === "UNPROTECTED"
+    ) {
+      return "bypassed";
+    }
+
     return "allowed";
   }
 
@@ -348,9 +395,15 @@ export default function ChatInterface({
           </p>
         </div>
 
-        <div className="chat-header-status">
+        <div
+          className={`chat-header-status${
+            protectionEnabled ? "" : " protection-off"
+          }`}
+        >
           <span className="protection-dot" />
-          WRDN protection enabled
+          {protectionEnabled
+            ? "WRDN protection enabled"
+            : "WRDN protection disabled (raw output)"}
         </div>
       </header>
 

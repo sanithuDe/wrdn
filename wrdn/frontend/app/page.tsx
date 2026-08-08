@@ -199,7 +199,10 @@ export default function Home() {
             onNewChat={startNewChat}
           />
         ) : (
-          <RegistryDashboard />
+          <RegistryDashboard
+            isAdmin={isAdmin}
+            clientId={user.client_id}
+          />
         )}
       </main>
     </div>
