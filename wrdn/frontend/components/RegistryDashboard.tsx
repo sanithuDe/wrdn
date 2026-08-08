@@ -4,7 +4,7 @@ import {
     useRegistryData,
     type RegistryLog,
 } from "@/hooks/useRegistryData";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
     Area,
@@ -19,6 +19,15 @@ import {
 } from "recharts";
 
 type TimeFilter = "1h" | "24h" | "7d" | "all";
+
+const TIME_FILTERS: TimeFilter[] = ["1h", "24h", "7d", "all"];
+
+/** Survives section navigation; resets to "all" on full page refresh. */
+let persistedTimeFilter: TimeFilter = "all";
+
+function isTimeFilter(value: string): value is TimeFilter {
+  return TIME_FILTERS.includes(value as TimeFilter);
+}
 
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ||
@@ -97,7 +106,13 @@ function getBucketKey(date: Date, filter: TimeFilter): string {
   });
 }
 
-export default function RegistryDashboard() {
+export default function RegistryDashboard({
+  isAdmin = false,
+  clientId = "clientA",
+}: {
+  isAdmin?: boolean;
+  clientId?: string;
+}) {
   const {
     registryData,
     loading,
@@ -106,8 +121,101 @@ export default function RegistryDashboard() {
     refresh,
   } = useRegistryData();
 
-  const [timeFilter, setTimeFilter] =
-    useState<TimeFilter>("all");
+  const [timeFilter, setTimeFilter] = useState<TimeFilter>(
+    persistedTimeFilter,
+  );
+  const [protectionEnabled, setProtectionEnabled] =
+    useState(true);
+  const [protectionBusy, setProtectionBusy] =
+    useState(false);
+  const [protectionMessage, setProtectionMessage] =
+    useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void fetch(
+      `${API_URL}/api/protection-status?client_id=${encodeURIComponent(
+        clientId,
+      )}`,
+    )
+      .then(async (response) => {
+        const data = await response.json();
+        if (!cancelled && response.ok) {
+          setProtectionEnabled(
+            Boolean(data.protection_enabled),
+          );
+          setProtectionMessage(
+            String(data.message || ""),
+          );
+        }
+      })
+      .catch(() => {
+        // Keep default enabled if status cannot load.
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [clientId]);
+
+  async function toggleProtection() {
+    if (!isAdmin || protectionBusy) {
+      return;
+    }
+
+    setProtectionBusy(true);
+    setProtectionMessage("");
+
+    try {
+      const response = await fetch(
+        `${API_URL}/api/admin/protection-status`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            client_id: clientId,
+            enabled: !protectionEnabled,
+          }),
+        },
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data?.detail ||
+            "Could not update protection status.",
+        );
+      }
+
+      setProtectionEnabled(
+        Boolean(data.protection_enabled),
+      );
+      setProtectionMessage(
+        String(data.message || ""),
+      );
+    } catch (toggleError) {
+      setProtectionMessage(
+        toggleError instanceof Error
+          ? toggleError.message
+          : "Could not update protection status.",
+      );
+    } finally {
+      setProtectionBusy(false);
+    }
+  }
+
+  function handleTimeFilterChange(value: string) {
+    if (!isTimeFilter(value)) {
+      return;
+    }
+
+    persistedTimeFilter = value;
+    setTimeFilter(value);
+  }
 
   function scrollToSection(sectionId: string) {
     document.getElementById(sectionId)?.scrollIntoView({
@@ -136,8 +244,8 @@ export default function RegistryDashboard() {
       .filter((log) => log.parsedDate !== null)
       .sort(
         (first, second) =>
-          first.parsedDate!.getTime() -
-          second.parsedDate!.getTime(),
+          second.parsedDate!.getTime() -
+          first.parsedDate!.getTime(),
       );
 
     if (allLogs.length === 0) {
@@ -356,9 +464,7 @@ export default function RegistryDashboard() {
               className="filter-select"
               value={timeFilter}
               onChange={(event) =>
-                setTimeFilter(
-                  event.target.value as TimeFilter,
-                )
+                handleTimeFilterChange(event.target.value)
               }
             >
               <option value="1h">Last 1 hour</option>
@@ -612,7 +718,9 @@ export default function RegistryDashboard() {
 
                         <td>
                           <span className="allowed-badge">
-                            {log.shield_status}
+                            {String(
+                              log.shield_status || "ALLOWED",
+                            ).toUpperCase()}
                           </span>
                         </td>
 
@@ -672,8 +780,17 @@ export default function RegistryDashboard() {
                         </td>
 
                         <td>
-                          <span className="risk-badge">
-                            {log.shield_status}
+                          <span
+                            className={
+                              String(log.shield_status)
+                                .toUpperCase() === "ALLOWED"
+                                ? "allowed-badge"
+                                : "risk-badge"
+                            }
+                          >
+                            {String(
+                              log.shield_status || "UNKNOWN",
+                            ).toUpperCase()}
                           </span>
                         </td>
 
@@ -786,6 +903,47 @@ export default function RegistryDashboard() {
               <span>Selected Time Range</span>
 
               <strong>{timeFilter}</strong>
+            </div>
+
+            <div className="setting-row protection-setting-row">
+              <div>
+                <span>WRDN Protection</span>
+                <p className="protection-setting-help">
+                  {protectionEnabled
+                    ? "Enabled: shield blocks unsafe AI output (normal secure mode)."
+                    : "Disabled: raw AI output is shown (BYPASSED) for demo comparison."}
+                </p>
+                {protectionMessage ? (
+                  <p className="protection-setting-message">
+                    {protectionMessage}
+                  </p>
+                ) : null}
+              </div>
+
+              {isAdmin ? (
+                <button
+                  type="button"
+                  className={`protection-toggle-button ${
+                    protectionEnabled
+                      ? "enabled"
+                      : "disabled"
+                  }`}
+                  disabled={protectionBusy}
+                  onClick={() => void toggleProtection()}
+                >
+                  {protectionBusy
+                    ? "Updating..."
+                    : protectionEnabled
+                      ? "Disable Protection"
+                      : "Enable Protection"}
+                </button>
+              ) : (
+                <strong>
+                  {protectionEnabled
+                    ? "ENABLED"
+                    : "DISABLED"}
+                </strong>
+              )}
             </div>
           </div>
         </section>

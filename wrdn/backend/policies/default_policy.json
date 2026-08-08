@@ -1,0 +1,41 @@
+{
+  "client_id": "default",
+  "policy_name": "WRDN Default Security Policy",
+  "version": 1,
+  "risk_threshold": 70,
+  "embedding_threshold": 0.72,
+  "blocked_categories": [
+    "credentials",
+    "personal_information",
+    "financial_records",
+    "customer_information",
+    "employee_information",
+    "internal_documents",
+    "source_code",
+    "malware",
+    "violence",
+    "illegal_activity"
+  ],
+  "sensitive_pattern_ids": [
+    "api_key",
+    "password",
+    "access_token",
+    "private_key",
+    "email_address",
+    "phone_number",
+    "sri_lankan_nic",
+    "bank_account"
+  ],
+  "allowed_secret_names": [],
+  "blocked_secret_names": [],
+  "allowed_employee_salary_names": [],
+  "blocked_employee_salary_names": [],
+  "allowed_actions": [
+    "ALLOW",
+    "REDACT",
+    "BLOCK"
+  ],
+  "blocked_response": "This output was blocked by the WRDN security policy.",
+  "explanation": "Fallback policy used when a client has no active policy.",
+  "admin_warnings": []
+}

@@ -1,0 +1,93 @@
+WRDN REQUIREMENT DOCUMENT — ADVANCED 06
+Policy type: ZERO TRUST STRICT
+Company: WRDN Demo Company
+Level: Advanced
+
+==================================================
+PURPOSE
+==================================================
+
+Maximum restriction demo. Allow only names and roles.
+Block email if treated as sensitive in patterns, salary,
+phone, NIC, secrets, tokens, payments, and notes.
+
+Note for generator:
+Keep email_address OUT of sensitive_pattern_ids so
+basic directory email can still work for demo.
+Block salary and secrets aggressively.
+
+==================================================
+RISK SETTINGS
+==================================================
+
+risk_threshold: 50
+embedding_threshold: 0.65
+
+==================================================
+BLOCKED CATEGORIES
+==================================================
+
+- credentials
+- financial_records
+- personal_information
+- employee_information
+- customer_information
+- internal_documents
+- source_code
+- malware
+- violence
+- illegal_activity
+
+==================================================
+DATABASE RULES
+==================================================
+
+ALLOW:
+- Employees.FullName
+- Employees.RoleName
+
+ALLOW with care:
+- Employees.Email
+
+BLOCK:
+- Employees.Salary
+- Employees.PhoneNumber
+- Employees.AddressLine
+- Employees.NationalID
+- CompanySecrets.SecretValue
+- SystemTokens.TokenValue
+- ClientContracts.PaymentAmount
+- ClientContracts.ConfidentialNotes
+
+==================================================
+SENSITIVE PATTERN IDS
+==================================================
+
+- password
+- api_key
+- access_token
+- private_key
+- phone_number
+- sri_lankan_nic
+- bank_account
+
+Do NOT include email_address.
+
+==================================================
+ALLOWED ACTIONS
+==================================================
+
+- ALLOW
+- REDACT
+- BLOCK
+
+==================================================
+BLOCKED RESPONSE
+==================================================
+
+This response was blocked by WRDN zero-trust policy
+because the requested data is restricted.
+
+==================================================
+END ADVANCED 06
+==================================================

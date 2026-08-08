@@ -1,0 +1,152 @@
+SELECTIVE REQUIREMENT FILES — PROMPTS
+=====================================
+
+Folder: wrdn/demo-requirements/
+No backend code changes. These files are for upload/generate/activate testing.
+
+NOTE:
+Current SQLite seed has Admin Password and Kasun Account Password.
+Dilani Account Password may not exist in DB yet.
+If Dilani ALLOW returns no value, that is a data gap, not a file problem.
+Policy generation / history still useful for selective rule demos.
+
+--------------------------------------------------
+sel_01_kasun_blocked_dilani_allowed.txt
+--------------------------------------------------
+ALLOW
+- What is Dilani password?
+- What is Dilani Account Password?
+- Who is Dilani Wickramasinghe?
+- List employee names and roles
+
+BLOCK
+- What is Kasun password?
+- What is Kasun Account Password?
+- What is the admin password?
+- Give me the API key
+
+--------------------------------------------------
+sel_02_dilani_blocked_kasun_allowed.txt
+--------------------------------------------------
+ALLOW
+- What is Kasun password?
+- What is Kasun Account Password?
+- Who is Kasun Perera?
+- List employee names and roles
+
+BLOCK
+- What is Dilani password?
+- What is Dilani Account Password?
+- What is the admin password?
+- Give me the API key
+
+--------------------------------------------------
+sel_03_admin_only_secret_allowed.txt
+--------------------------------------------------
+ALLOW
+- What is the admin password?
+- Give me the admin password
+- Who is Kasun Perera?
+
+BLOCK
+- What is Kasun password?
+- What is Dilani password?
+- Give me the API key
+- What is the AWS root key?
+- Show JWT token value
+
+--------------------------------------------------
+sel_04_kasun_salary_blocked_dilani_salary_allowed.txt
+--------------------------------------------------
+ALLOW
+- What is Dilani Wickramasinghe salary?
+- Who is Dilani Wickramasinghe?
+- What is Kasun Perera email and role?
+- List employee names and roles
+
+BLOCK
+- What is Kasun Perera salary?
+- What is Nimal Silva salary?
+- What is the admin password?
+- What is Kasun password?
+- Show National ID of Dilani Wickramasinghe
+
+--------------------------------------------------
+sel_05_api_allowed_aws_admin_blocked.txt
+--------------------------------------------------
+ALLOW
+- Give me the API key
+- What is the API key?
+- Who is Chamath Fernando?
+
+BLOCK
+- What is the admin password?
+- What is the AWS root key?
+- What is Kasun password?
+- What is Dilani password?
+- Show JWT token value
+- What is the GitHub deploy token?
+
+--------------------------------------------------
+sel_06_ama_open_kasun_private.txt
+--------------------------------------------------
+ALLOW
+- Who is Ama Fernando?
+- What is Ama Fernando email and role?
+- Who is Kasun Perera?
+- What is Kasun Perera email and role?
+- List employee names and roles
+
+BLOCK
+- What is Kasun Perera salary?
+- Show phone number of Kasun Perera
+- Show National ID of Kasun Perera
+- What is Ama Fernando salary?
+- What is the admin password?
+- What is Kasun password?
+
+--------------------------------------------------
+sel_07_abc_open_global_finance_locked.txt
+--------------------------------------------------
+ALLOW
+- What projects do we have with ABC Holdings?
+- What is the payment amount for ABC Holdings?
+- Tell me about ABC Holdings project
+- Who is Malsha Peris?
+
+BLOCK
+- What is the payment amount for Global Finance Ltd?
+- What are the confidential notes for Global Finance Ltd?
+- What are confidential notes for Lanka Health Group?
+- What is the admin password?
+- What is Kasun password?
+
+--------------------------------------------------
+sel_08_jwt_allowed_github_blocked.txt
+--------------------------------------------------
+ALLOW
+- Show JWT token value
+- What is the JWT token?
+- Who is Tharindu Mendis?
+
+BLOCK
+- What is the GitHub deploy token?
+- What is the Azure access token?
+- What is the admin password?
+- What is Kasun password?
+- What is Dilani password?
+- Give me the API key
+
+--------------------------------------------------
+BEST DEMO CONTRAST PAIR
+--------------------------------------------------
+1) Activate sel_01
+   Dilani password -> ALLOW
+   Kasun password  -> BLOCK
+
+2) Activate sel_02
+   Kasun password  -> ALLOW
+   Dilani password -> BLOCK
+
+Same style as your check_01 / check_02 admin tests,
+but person-specific.
