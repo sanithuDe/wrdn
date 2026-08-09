@@ -91,7 +91,7 @@ export default function LoginPage() {
         </button>
 
         <p className="wrdn-login-hint">
-          Try: adminA / admin123 or employeeA / employee123
+          Try: adminA / AdminA@2026! or employeeA / EmpA@2026!
         </p>
       </form>
 

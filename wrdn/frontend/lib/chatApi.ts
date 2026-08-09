@@ -23,6 +23,7 @@ export interface ChatApiResponse {
 export async function sendChatMessage(
   userPrompt: string,
   clientId: string,
+  username = "",
 ): Promise<ChatApiResponse> {
   let response: Response;
 
@@ -35,6 +36,7 @@ export async function sendChatMessage(
       body: JSON.stringify({
         prompt: userPrompt,
         client_id: clientId,
+        username,
       }),
     });
   } catch {

@@ -85,10 +85,12 @@ def request_policy_activation(
 
         if row["Status"] not in {
             "VALIDATED",
+            "REJECTED",
             "PENDING_ACTIVATION",
         }:
             raise ValueError(
-                "Only VALIDATED policies can request activation."
+                "Only VALIDATED or REJECTED policies "
+                "can request activation."
             )
 
         connection.execute(
@@ -296,7 +298,7 @@ def reject_policy_activation(token: str) -> dict:
         connection.execute(
             """
             UPDATE ClientPolicies
-            SET Status = 'VALIDATED'
+            SET Status = 'REJECTED'
             WHERE PolicyID = ?
               AND ClientID = ?
             """,
@@ -321,7 +323,7 @@ def reject_policy_activation(token: str) -> dict:
         return {
             "policy_id": policy_id,
             "client_id": client_id,
-            "status": "VALIDATED",
+            "status": "REJECTED",
             "rejected_at": processed_at,
         }
 

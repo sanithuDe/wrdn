@@ -128,7 +128,7 @@ function ActivationContent() {
           }
 
           notifyOriginalPolicyPage({
-            status: "VALIDATED",
+            status: "REJECTED",
             policy_id: data.policy_id,
             client_id: data.client_id,
           });
@@ -141,7 +141,7 @@ function ActivationContent() {
             rows: [
               ["Client", String(data.client_id)],
               ["Policy ID", String(data.policy_id)],
-              ["Status", "VALIDATED (not live)"],
+              ["Status", "REJECTED"],
               [
                 "Rejected at (SL)",
                 data.rejected_at_display || "—",

@@ -8,6 +8,7 @@ from wrdn.backend.database import (
     get_connection,
     get_current_utc_time,
     get_user_by_username,
+    update_user_password,
 )
 
 
@@ -96,20 +97,12 @@ def login_user(
 
 
 def logout_user(token: str) -> None:
-    """
-    Remove session token.
-    """
-
     ACTIVE_SESSIONS.pop(token, None)
 
 
 def get_user_from_token(
     token: str | None,
 ) -> dict[str, Any] | None:
-    """
-    Return logged-in user from token.
-    """
-
     if not token:
         return None
 
@@ -118,29 +111,33 @@ def get_user_from_token(
 
 def ensure_demo_users() -> list[dict[str, str]]:
     """
-    Create demo client + admin/employee users
-    if they do not already exist.
+    Ensure demo clients and users exist.
+
+    Demo passwords are updated if they changed in code,
+    so Docker volumes do not keep old weak passwords.
     """
 
     connection = get_connection()
 
     try:
-        # Ensure demo clients exist.
-        for client_id, client_name in [
-            ("clientA", "Client A Company"),
-            ("clientB", "Client B Company"),
-        ]:
-            existing = connection.execute(
+        cursor = connection.cursor()
+
+        for client_id, client_name in (
+            ("clientA", "Client A"),
+            ("clientB", "Client B"),
+        ):
+            existing = cursor.execute(
                 """
                 SELECT ClientID
                 FROM Clients
                 WHERE ClientID = ?
+                LIMIT 1
                 """,
                 (client_id,),
             ).fetchone()
 
             if existing is None:
-                connection.execute(
+                cursor.execute(
                     """
                     INSERT INTO Clients (
                         ClientID,
@@ -164,25 +161,25 @@ def ensure_demo_users() -> list[dict[str, str]]:
     demo_accounts = [
         {
             "username": "adminA",
-            "password": "admin123",
+            "password": "AdminA@2026!",
             "role": "ADMIN",
             "client_id": "clientA",
         },
         {
             "username": "employeeA",
-            "password": "employee123",
+            "password": "EmpA@2026!",
             "role": "EMPLOYEE",
             "client_id": "clientA",
         },
         {
             "username": "adminB",
-            "password": "admin123",
+            "password": "AdminB@2026!",
             "role": "ADMIN",
             "client_id": "clientB",
         },
         {
             "username": "employeeB",
-            "password": "employee123",
+            "password": "EmpB@2026!",
             "role": "EMPLOYEE",
             "client_id": "clientB",
         },
@@ -194,23 +191,34 @@ def ensure_demo_users() -> list[dict[str, str]]:
         existing_user = get_user_by_username(
             account["username"]
         )
+        password_hash = hash_password(
+            account["password"]
+        )
 
         if existing_user is not None:
+            if not verify_password(
+                account["password"],
+                str(existing_user["PasswordHash"]),
+            ):
+                update_user_password(
+                    account["username"],
+                    password_hash,
+                )
+
             created.append(
                 {
                     "username": account["username"],
                     "role": account["role"],
                     "client_id": account["client_id"],
-                    "status": "EXISTS",
+                    "status": "UPDATED",
+                    "password": account["password"],
                 }
             )
             continue
 
         create_user(
             username=account["username"],
-            password_hash=hash_password(
-                account["password"]
-            ),
+            password_hash=password_hash,
             role=account["role"],
             client_id=account["client_id"],
         )

@@ -1,6 +1,23 @@
+import { getAuthUser } from "@/lib/authApi";
+
 export async function fetchRegistryData() {
+  const user = getAuthUser();
+
+  const params = new URLSearchParams();
+  if (user?.client_id) {
+    params.set("client_id", user.client_id);
+  }
+  if (user?.username) {
+    params.set("username", user.username);
+  }
+  if (user?.role) {
+    params.set("role", user.role);
+  }
+
+  const query = params.toString();
+
   const response = await fetch(
-    "/api/registry",
+    `/api/registry${query ? `?${query}` : ""}`,
     {
       method: "GET",
       headers: {

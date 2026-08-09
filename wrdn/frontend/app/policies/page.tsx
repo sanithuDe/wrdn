@@ -7,24 +7,24 @@ import { useEffect, useState } from "react";
 import AppSidebar from "@/components/AppSidebar";
 
 import {
-    activatePolicy,
-    analyzeRequirement,
-    deletePolicy,
-    listPolicies,
-    rollbackPolicy,
-    uploadRequirement,
-    validatePolicy,
+  activatePolicy,
+  analyzeRequirement,
+  deletePolicy,
+  listPolicies,
+  rollbackPolicy,
+  uploadRequirement,
+  validatePolicy,
 } from "@/lib/api";
 
 import type {
-    PolicyGenerationResponse,
-    PolicyHistoryItem,
+  PolicyGenerationResponse,
+  PolicyHistoryItem,
 } from "@/lib/api";
 
 import {
-    clearAuthSession,
-    getAuthUser,
-    type AuthUser,
+  clearAuthSession,
+  getAuthUser,
+  type AuthUser,
 } from "@/lib/authApi";
 
 type Step = 1 | 2 | 3 | 4;
@@ -214,11 +214,17 @@ export default function PoliciesPage() {
 
       setNotice({
         type:
-          data?.status === "ACTIVE" ? "success" : "info",
+          data?.status === "ACTIVE"
+            ? "success"
+            : data?.status === "REJECTED"
+              ? "error"
+              : "info",
         message:
           data?.status === "ACTIVE"
             ? "Policy activated from email confirmation."
-            : "Activation was rejected from email.",
+            : data?.status === "REJECTED"
+              ? "Policy activation was rejected. Status is now REJECTED."
+              : "Activation was rejected from email.",
       });
 
       if (clientId.trim()) {
@@ -815,6 +821,16 @@ export default function PoliciesPage() {
                             </div>
                           )}
 
+                          {generatedPolicy.status ===
+                            "REJECTED" && (
+                            <div className="rejected-activation-box">
+                              Activation was rejected. This
+                              policy is marked REJECTED and is
+                              not live. You can request
+                              activation again.
+                            </div>
+                          )}
+
                           <div className="actions">
                             <SecondaryButton
                               text="Back"
@@ -840,6 +856,8 @@ export default function PoliciesPage() {
                                 (generatedPolicy.status !==
                                   "VALIDATED" &&
                                   generatedPolicy.status !==
+                                    "REJECTED" &&
+                                  generatedPolicy.status !==
                                     "PENDING_ACTIVATION") ||
                                 busyAction === "activate"
                               }
@@ -849,7 +867,10 @@ export default function PoliciesPage() {
                                 : generatedPolicy.status ===
                                     "PENDING_ACTIVATION"
                                   ? "Resend Confirmation Email"
-                                  : "Request Activation"}
+                                  : generatedPolicy.status ===
+                                      "REJECTED"
+                                    ? "Request Activation Again"
+                                    : "Request Activation"}
                             </button>
                           </div>
                         </div>
@@ -1763,6 +1784,18 @@ export default function PoliciesPage() {
             .status-badge.rejected {
               color: #fecaca;
               background: #7f1d1d;
+              border: 1px solid rgba(248, 113, 113, 0.45);
+            }
+
+            .rejected-activation-box {
+              margin: 12px 0;
+              padding: 12px 14px;
+              border: 1px solid rgba(248, 113, 113, 0.4);
+              border-radius: 12px;
+              color: #fecaca;
+              background: rgba(127, 29, 29, 0.35);
+              font-size: 13px;
+              line-height: 1.45;
             }
 
             .history-header {
@@ -2069,9 +2102,12 @@ function Detail({
 }
 
 function StatusBadge({ status }: { status: string }) {
+  const normalized = (status || "UNKNOWN").toUpperCase();
+  const className = normalized.toLowerCase();
+
   return (
-    <span className={`status-badge ${status.toLowerCase()}`}>
-      {status}
+    <span className={`status-badge ${className}`}>
+      {normalized}
     </span>
   );
 }

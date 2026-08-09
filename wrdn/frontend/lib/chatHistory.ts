@@ -13,63 +13,141 @@ export interface ChatSession {
   title: string;
   updatedAt: string;
   messages: StoredChatMessage[];
+  ownerUsername?: string;
+  ownerRole?: string;
+  clientId?: string;
 }
 
-const STORAGE_KEY = "wrdn_chat_history_v1";
+export type ChatUserContext = {
+  username: string;
+  role: string;
+  clientId: string;
+};
+
 export const MAX_CHAT_SESSIONS = 5;
+const MAX_TEAM_CHAT_SESSIONS = 20;
 
 function canUseStorage() {
   return typeof window !== "undefined";
 }
 
-export function loadChatSessions(): ChatSession[] {
-  if (!canUseStorage()) {
+function personalKey(username: string) {
+  return `wrdn_chat_v2:${username.trim().toLowerCase()}`;
+}
+
+function teamKey(clientId: string) {
+  return `wrdn_team_chats_v2:${clientId.trim().toLowerCase()}`;
+}
+
+function parseSessions(raw: string | null): ChatSession[] {
+  if (!raw) {
     return [];
   }
 
   try {
-    const raw = window.localStorage.getItem(
-      STORAGE_KEY,
-    );
-
-    if (!raw) {
-      return [];
-    }
-
     const parsed = JSON.parse(raw);
 
     if (!Array.isArray(parsed)) {
       return [];
     }
 
-    return parsed
-      .filter(
-        (item) =>
-          item &&
-          typeof item.id === "string" &&
-          typeof item.title === "string" &&
-          Array.isArray(item.messages) &&
-          item.messages.length > 0,
-      )
-      .slice(0, MAX_CHAT_SESSIONS) as ChatSession[];
+    return parsed.filter(
+      (item) =>
+        item &&
+        typeof item.id === "string" &&
+        typeof item.title === "string" &&
+        Array.isArray(item.messages) &&
+        item.messages.length > 0,
+    ) as ChatSession[];
   } catch {
     return [];
   }
 }
 
-function saveChatSessions(
+function readKey(key: string): ChatSession[] {
+  if (!canUseStorage()) {
+    return [];
+  }
+
+  return parseSessions(
+    window.localStorage.getItem(key),
+  );
+}
+
+function writeKey(
+  key: string,
   sessions: ChatSession[],
+  max: number,
 ) {
   if (!canUseStorage()) {
     return;
   }
 
   window.localStorage.setItem(
-    STORAGE_KEY,
-    JSON.stringify(
-      sessions.slice(0, MAX_CHAT_SESSIONS),
-    ),
+    key,
+    JSON.stringify(sessions.slice(0, max)),
   );
+}
+
+function withOwner(
+  session: ChatSession,
+  ctx: ChatUserContext,
+): ChatSession {
+  return {
+    ...session,
+    ownerUsername: ctx.username,
+    ownerRole: ctx.role,
+    clientId: ctx.clientId,
+  };
+}
+
+/** Personal chats for one user only. */
+export function loadPersonalChatSessions(
+  ctx: ChatUserContext,
+): ChatSession[] {
+  return readKey(personalKey(ctx.username)).slice(
+    0,
+    MAX_CHAT_SESSIONS,
+  );
+}
+
+/**
+ * What the signed-in user may see in Recent Chats.
+ * Employee: own chats only.
+ * Admin: own chats + other users on the same client.
+ */
+export function loadVisibleChatSessions(
+  ctx: ChatUserContext,
+): ChatSession[] {
+  const personal = loadPersonalChatSessions(ctx).map(
+    (session) => withOwner(session, ctx),
+  );
+
+  const isAdmin =
+    ctx.role.trim().toUpperCase() === "ADMIN";
+
+  if (!isAdmin) {
+    return personal;
+  }
+
+  const team = readKey(teamKey(ctx.clientId)).filter(
+    (session) =>
+      (session.ownerUsername || "")
+        .trim()
+        .toLowerCase() !==
+        ctx.username.trim().toLowerCase() &&
+      (session.clientId || ctx.clientId) ===
+        ctx.clientId,
+  );
+
+  const merged = [...personal, ...team].sort(
+    (a, b) =>
+      Date.parse(b.updatedAt || "") -
+      Date.parse(a.updatedAt || ""),
+  );
+
+  // Keep a bit more for admins so team history is visible.
+  return merged.slice(0, MAX_CHAT_SESSIONS + 10);
 }
 
 export function getChatSessionTitle(
@@ -90,31 +168,67 @@ export function getChatSessionTitle(
     : text;
 }
 
-export function upsertChatSession(
+export function displayChatTitle(
   session: ChatSession,
-): ChatSession[] {
-  if (!session.messages.length) {
-    return loadChatSessions();
+  viewerUsername: string,
+): string {
+  const owner = (session.ownerUsername || "").trim();
+  const base = session.title || "Chat";
+
+  if (
+    owner &&
+    owner.toLowerCase() !==
+      viewerUsername.trim().toLowerCase()
+  ) {
+    return `[${owner}] ${base}`;
   }
 
-  const current = loadChatSessions().filter(
-    (item) => item.id !== session.id,
-  );
+  return base;
+}
 
-  const next = [session, ...current].slice(
+export function upsertChatSession(
+  session: ChatSession,
+  ctx: ChatUserContext,
+): ChatSession[] {
+  if (!session.messages.length) {
+    return loadVisibleChatSessions(ctx);
+  }
+
+  const owned = withOwner(session, ctx);
+
+  const personal = loadPersonalChatSessions(ctx).filter(
+    (item) => item.id !== owned.id,
+  );
+  const nextPersonal = [owned, ...personal].slice(
     0,
     MAX_CHAT_SESSIONS,
   );
+  writeKey(
+    personalKey(ctx.username),
+    nextPersonal,
+    MAX_CHAT_SESSIONS,
+  );
 
-  saveChatSessions(next);
-  return next;
+  // Mirror into client team store so admins can review
+  // employee (and peer) activity on this client.
+  const team = readKey(teamKey(ctx.clientId)).filter(
+    (item) => item.id !== owned.id,
+  );
+  writeKey(
+    teamKey(ctx.clientId),
+    [owned, ...team],
+    MAX_TEAM_CHAT_SESSIONS,
+  );
+
+  return loadVisibleChatSessions(ctx);
 }
 
 export function getChatSessionById(
   sessionId: string,
+  ctx: ChatUserContext,
 ): ChatSession | null {
   return (
-    loadChatSessions().find(
+    loadVisibleChatSessions(ctx).find(
       (item) => item.id === sessionId,
     ) ?? null
   );
@@ -124,4 +238,9 @@ export function createChatSessionId() {
   return `chat-${Date.now()}-${Math.random()
     .toString(36)
     .slice(2, 8)}`;
+}
+
+/** @deprecated use loadVisibleChatSessions with user ctx */
+export function loadChatSessions(): ChatSession[] {
+  return [];
 }

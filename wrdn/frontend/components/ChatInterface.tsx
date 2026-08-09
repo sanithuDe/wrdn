@@ -19,9 +19,10 @@ import {
   createChatSessionId,
   getChatSessionById,
   getChatSessionTitle,
-  loadChatSessions,
+  loadVisibleChatSessions,
   upsertChatSession,
   type ChatSession,
+  type ChatUserContext,
   type StoredChatMessage,
 } from "@/lib/chatHistory";
 
@@ -31,14 +32,18 @@ interface ChatInterfaceProps {
   resetSignal: number;
   loadChatId?: string | null;
   onHistoryChange?: (sessions: ChatSession[]) => void;
-  onActiveSessionChange?: (sessionId: string | null) => void;
+  onActiveSessionChange?: (
+    sessionId: string | null,
+  ) => void;
   recentChats?: Array<{
     id: string;
     title: string;
+    ownerUsername?: string;
   }>;
   activeChatId?: string | null;
   onSelectChat?: (chatId: string) => void;
   onNewChat?: () => void;
+  isAdmin?: boolean;
 }
 
 const starterQuestions = [
@@ -54,9 +59,7 @@ function createMessageId() {
     .slice(2)}`;
 }
 
-function getAssistantContent(
-  data: ChatApiResponse,
-) {
+function getAssistantContent(data: ChatApiResponse) {
   return (
     data.final_output ||
     data.response ||
@@ -74,27 +77,45 @@ export default function ChatInterface({
   activeChatId = null,
   onSelectChat,
   onNewChat,
+  isAdmin = false,
 }: ChatInterfaceProps) {
-  const [messages, setMessages] =
-    useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>(
+    [],
+  );
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
   const [clientId, setClientId] = useState("");
+  const [username, setUsername] = useState("");
+  const [userRole, setUserRole] = useState("");
+  const [viewOnlyOwner, setViewOnlyOwner] = useState<
+    string | null
+  >(null);
   const [protectionEnabled, setProtectionEnabled] =
     useState(true);
-  const [sessionId, setSessionId] = useState(
-    () => createChatSessionId(),
+  const [sessionId, setSessionId] = useState(() =>
+    createChatSessionId(),
   );
 
-  const messageEndRef =
-    useRef<HTMLDivElement | null>(null);
+  const messageEndRef = useRef<HTMLDivElement | null>(
+    null,
+  );
   const messagesRef = useRef<ChatMessage[]>([]);
   const sessionIdRef = useRef(sessionId);
   const lastHandledReset = useRef(resetSignal);
-  const lastLoadedChatId = useRef<string | null>(
-    null,
-  );
+  const lastLoadedChatId = useRef<string | null>(null);
+
+  function getChatCtx(): ChatUserContext | null {
+    if (!username.trim() || !clientId.trim()) {
+      return null;
+    }
+
+    return {
+      username: username.trim(),
+      role: userRole || "EMPLOYEE",
+      clientId: clientId.trim(),
+    };
+  }
 
   useEffect(() => {
     messagesRef.current = messages;
@@ -105,9 +126,12 @@ export default function ChatInterface({
   }, [sessionId]);
 
   useEffect(() => {
-    const sessions = loadChatSessions();
-    onHistoryChange?.(sessions);
-  }, [onHistoryChange]);
+    const ctx = getChatCtx();
+    if (!ctx) {
+      return;
+    }
+    onHistoryChange?.(loadVisibleChatSessions(ctx));
+  }, [onHistoryChange, username, clientId, userRole]);
 
   function publishHistory(
     sessions: ChatSession[],
@@ -121,9 +145,19 @@ export default function ChatInterface({
     nextMessages: ChatMessage[],
     id = sessionIdRef.current,
   ) {
+    const ctx = getChatCtx();
+    if (!ctx) {
+      return [];
+    }
+
+    if (viewOnlyOwner) {
+      publishHistory(loadVisibleChatSessions(ctx), id);
+      return loadVisibleChatSessions(ctx);
+    }
+
     if (nextMessages.length === 0) {
-      publishHistory(loadChatSessions(), id);
-      return loadChatSessions();
+      publishHistory(loadVisibleChatSessions(ctx), id);
+      return loadVisibleChatSessions(ctx);
     }
 
     const session: ChatSession = {
@@ -133,7 +167,7 @@ export default function ChatInterface({
       messages: nextMessages,
     };
 
-    const sessions = upsertChatSession(session);
+    const sessions = upsertChatSession(session, ctx);
     publishHistory(sessions, id);
     return sessions;
   }
@@ -147,31 +181,41 @@ export default function ChatInterface({
     setInput("");
     setError("");
     setSending(false);
+    setViewOnlyOwner(null);
     onActiveSessionChange?.(null);
   }
 
-  // New Chat button
   useEffect(() => {
     if (resetSignal === lastHandledReset.current) {
       return;
     }
 
     lastHandledReset.current = resetSignal;
-    persistMessages(messagesRef.current);
+    if (!viewOnlyOwner) {
+      persistMessages(messagesRef.current);
+    }
     startBlankChat();
-    publishHistory(loadChatSessions(), null);
+    const ctx = getChatCtx();
+    if (ctx) {
+      publishHistory(loadVisibleChatSessions(ctx), null);
+    }
   }, [resetSignal]);
 
-  // Open a recent chat from sidebar
   useEffect(() => {
     if (!loadChatId) {
       lastLoadedChatId.current = null;
       return;
     }
 
+    const ctx = getChatCtx();
+    if (!ctx) {
+      return;
+    }
+
     if (
       sessionIdRef.current !== loadChatId &&
-      messagesRef.current.length > 0
+      messagesRef.current.length > 0 &&
+      !viewOnlyOwner
     ) {
       persistMessages(
         messagesRef.current,
@@ -179,9 +223,12 @@ export default function ChatInterface({
       );
     }
 
-    const session = getChatSessionById(loadChatId);
-
+    const session = getChatSessionById(loadChatId, ctx);
     if (!session) {
+      return;
+    }
+
+    if (lastLoadedChatId.current === loadChatId) {
       return;
     }
 
@@ -193,8 +240,19 @@ export default function ChatInterface({
     setInput("");
     setError("");
     setSending(false);
+
+    const owner = (session.ownerUsername || "").trim();
+    if (
+      owner &&
+      owner.toLowerCase() !== ctx.username.toLowerCase()
+    ) {
+      setViewOnlyOwner(owner);
+    } else {
+      setViewOnlyOwner(null);
+    }
+
     onActiveSessionChange?.(session.id);
-  }, [loadChatId]);
+  }, [loadChatId, username, clientId, userRole]);
 
   useEffect(() => {
     messageEndRef.current?.scrollIntoView({
@@ -208,10 +266,14 @@ export default function ChatInterface({
     if (!user?.client_id) {
       setError("Please login first.");
       setClientId("");
+      setUsername("");
+      setUserRole("");
       return;
     }
 
     setClientId(user.client_id);
+    setUsername(user.username);
+    setUserRole(user.role);
   }, []);
 
   useEffect(() => {
@@ -248,18 +310,14 @@ export default function ChatInterface({
     };
   }, [clientId]);
 
-  async function submitMessage(
-    promptOverride?: string,
-  ) {
-    const prompt = (
-      promptOverride ?? input
-    ).trim();
+  async function submitMessage(promptOverride?: string) {
+    const prompt = (promptOverride ?? input).trim();
 
-    if (!prompt || sending) {
+    if (!prompt || sending || viewOnlyOwner) {
       return;
     }
 
-    if (!clientId.trim()) {
+    if (!clientId.trim() || !username.trim()) {
       setError("Please login first.");
       return;
     }
@@ -270,10 +328,7 @@ export default function ChatInterface({
       content: prompt,
     };
 
-    const withUser = [
-      ...messagesRef.current,
-      userMessage,
-    ];
+    const withUser = [...messagesRef.current, userMessage];
 
     messagesRef.current = withUser;
     setMessages(withUser);
@@ -286,6 +341,7 @@ export default function ChatInterface({
       const data = await sendChatMessage(
         prompt,
         clientId.trim(),
+        username.trim(),
       );
 
       if (typeof data.protection_enabled === "boolean") {
@@ -303,10 +359,7 @@ export default function ChatInterface({
         detectionReason: data.detection_reason,
       };
 
-      const withAssistant = [
-        ...withUser,
-        assistantMessage,
-      ];
+      const withAssistant = [...withUser, assistantMessage];
 
       messagesRef.current = withAssistant;
       setMessages(withAssistant);
@@ -340,9 +393,7 @@ export default function ChatInterface({
     }
   }
 
-  function handleSubmit(
-    event: FormEvent<HTMLFormElement>,
-  ) {
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     void submitMessage();
   }
@@ -383,15 +434,17 @@ export default function ChatInterface({
     return "allowed";
   }
 
+  const historyLimit = isAdmin ? 12 : 5;
+
   return (
     <section className="chat-page">
       <header className="chat-header">
         <div>
           <h1>WRDN AI Assistant</h1>
           <p>
-            Secure company intelligence protected by
-            WRDN. Your last 5 chats are kept on the
-            right.
+            {isAdmin
+              ? "Admin view: your chats are private to you. You can also open employee chats from this client on the right (view only)."
+              : "Employee view: your chats stay private to your account. Admins on your client can review them."}
           </p>
         </div>
 
@@ -410,6 +463,14 @@ export default function ChatInterface({
       <div className="chat-body">
         <div className="chat-main">
           <div className="chat-content">
+            {viewOnlyOwner ? (
+              <p className="chat-error" style={{ margin: "0 0 12px" }}>
+                Viewing {viewOnlyOwner}&apos;s chat
+                (read-only). Start a New chat to ask your
+                own questions.
+              </p>
+            ) : null}
+
             {messages.length === 0 ? (
               <div className="chat-welcome">
                 <div className="welcome-logo">W</div>
@@ -429,7 +490,9 @@ export default function ChatInterface({
                         void submitMessage(question)
                       }
                       disabled={
-                        sending || !clientId.trim()
+                        sending ||
+                        !clientId.trim() ||
+                        Boolean(viewOnlyOwner)
                       }
                     >
                       <span>{question}</span>
@@ -446,16 +509,14 @@ export default function ChatInterface({
                     className={`chat-message ${message.role}`}
                   >
                     <div className="message-avatar">
-                      {message.role === "user"
-                        ? "U"
-                        : "W"}
+                      {message.role === "user" ? "U" : "W"}
                     </div>
 
                     <div className="message-body">
                       <div className="message-heading">
                         <strong>
                           {message.role === "user"
-                            ? "You"
+                            ? viewOnlyOwner || "You"
                             : "WRDN Assistant"}
                         </strong>
 
@@ -520,9 +581,7 @@ export default function ChatInterface({
             )}
           </div>
 
-          {error && (
-            <p className="chat-error">{error}</p>
-          )}
+          {error && <p className="chat-error">{error}</p>}
 
           <div className="chat-input-area">
             <form
@@ -535,16 +594,25 @@ export default function ChatInterface({
                   setInput(event.target.value)
                 }
                 onKeyDown={handleKeyDown}
-                placeholder="Ask WRDN a question…"
+                placeholder={
+                  viewOnlyOwner
+                    ? "Read-only employee chat — click New to chat"
+                    : "Ask WRDN a question…"
+                }
                 rows={1}
-                disabled={sending || !clientId.trim()}
+                disabled={
+                  sending ||
+                  !clientId.trim() ||
+                  Boolean(viewOnlyOwner)
+                }
               />
               <button
                 type="submit"
                 disabled={
                   sending ||
                   !input.trim() ||
-                  !clientId.trim()
+                  !clientId.trim() ||
+                  Boolean(viewOnlyOwner)
                 }
                 aria-label="Send message"
               >
@@ -561,7 +629,9 @@ export default function ChatInterface({
           <div className="chat-history-dock">
             <div className="chat-history-header">
               <p className="chat-history-label">
-                Recent chats
+                {isAdmin
+                  ? "My + team chats"
+                  : "Your recent chats"}
               </p>
               <button
                 type="button"
@@ -575,25 +645,30 @@ export default function ChatInterface({
             <div className="chat-history-list">
               {recentChats.length === 0 ? (
                 <p className="chat-history-empty">
-                  Send a message, then start a new chat to
-                  keep it here.
+                  {isAdmin
+                    ? "Your chats and employee chats for this client appear here."
+                    : "Send a message, then start a new chat to keep it here."}
                 </p>
               ) : (
-                recentChats.slice(0, 5).map((chat) => (
-                  <button
-                    key={chat.id}
-                    type="button"
-                    className={`chat-history-item${
-                      activeChatId === chat.id
-                        ? " active"
-                        : ""
-                    }`}
-                    title={chat.title}
-                    onClick={() => onSelectChat?.(chat.id)}
-                  >
-                    {chat.title}
-                  </button>
-                ))
+                recentChats
+                  .slice(0, historyLimit)
+                  .map((chat) => (
+                    <button
+                      key={chat.id}
+                      type="button"
+                      className={`chat-history-item${
+                        activeChatId === chat.id
+                          ? " active"
+                          : ""
+                      }`}
+                      title={chat.title}
+                      onClick={() =>
+                        onSelectChat?.(chat.id)
+                      }
+                    >
+                      {chat.title}
+                    </button>
+                  ))
               )}
             </div>
           </div>

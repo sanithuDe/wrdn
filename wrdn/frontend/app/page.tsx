@@ -21,7 +21,8 @@ import {
 } from "@/lib/authApi";
 
 import {
-  loadChatSessions,
+  displayChatTitle,
+  loadVisibleChatSessions,
   type ChatSession,
 } from "@/lib/chatHistory";
 
@@ -99,7 +100,13 @@ export default function Home() {
 
     setUser(currentUser);
     setCheckingAuth(false);
-    setRecentChats(loadChatSessions());
+    setRecentChats(
+      loadVisibleChatSessions({
+        username: currentUser.username,
+        role: currentUser.role,
+        clientId: currentUser.client_id,
+      }),
+    );
   }, [router]);
 
   useEffect(() => {
@@ -193,16 +200,22 @@ export default function Home() {
             }
             recentChats={recentChats.map((chat) => ({
               id: chat.id,
-              title: chat.title,
+              title: displayChatTitle(
+                chat,
+                user.username,
+              ),
+              ownerUsername: chat.ownerUsername,
             }))}
             activeChatId={activeChatId}
             onSelectChat={handleSelectChat}
             onNewChat={startNewChat}
+            isAdmin={isAdmin}
           />
         ) : (
           <RegistryDashboard
             isAdmin={isAdmin}
             clientId={user.client_id}
+            username={user.username}
           />
         )}
       </main>
