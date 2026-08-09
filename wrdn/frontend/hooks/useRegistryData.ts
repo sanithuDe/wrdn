@@ -10,6 +10,8 @@ import {
 export interface RegistryLog {
   id: number;
   timestamp: string;
+  username?: string;
+  client_id?: string;
   user_prompt: string;
   raw_ai_output: string;
   shield_status: string;
@@ -26,6 +28,10 @@ export interface RegistryResponse {
   audit_count?: number;
   allowed_count?: number;
   blocked_count?: number;
+  scope?: string;
+  viewer_role?: string;
+  viewer_username?: string;
+  client_id?: string;
   allowed_logs: RegistryLog[];
   blocked_logs: RegistryLog[];
   error?: string;

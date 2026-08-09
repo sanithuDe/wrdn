@@ -164,6 +164,32 @@ export default function HrCandidatesPage() {
     setError("");
   }
 
+  function evaluationText(
+    evaluation: Record<string, unknown>,
+    key: string,
+    fallback = "Not provided",
+  ): string {
+    const value = evaluation[key];
+    if (value == null || value === "") {
+      return fallback;
+    }
+    return String(value).trim() || fallback;
+  }
+
+  function suitabilityLabel(raw: string): string {
+    const key = raw.trim().toLowerCase();
+    if (key === "strong_fit") {
+      return "Strong fit for this role";
+    }
+    if (key === "possible_fit") {
+      return "Possible fit — review recommended";
+    }
+    if (key === "weak_fit") {
+      return "Weak fit for this role";
+    }
+    return raw.replace(/_/g, " ") || "Not assessed";
+  }
+
   async function handleProcess(
     event: FormEvent<HTMLFormElement>,
   ) {
@@ -535,20 +561,110 @@ export default function HrCandidatesPage() {
                     <div className="hr-panel">
                       <div className="hr-panel-head">
                         <h2>
-                          2. {result.agent_1.name}
+                          2. Candidate evaluation
                         </h2>
                         <p>
-                          Internal evaluation (not
-                          emailed to the candidate).
+                          Internal HR summary only —
+                          this is not sent to the
+                          candidate.
                         </p>
                       </div>
-                      <pre className="hr-json">
-                        {JSON.stringify(
-                          result.agent_1.evaluation,
-                          null,
-                          2,
-                        )}
-                      </pre>
+
+                      <div className="hr-eval">
+                        <section className="hr-eval-section">
+                          <h3>Candidate details</h3>
+                          <div className="hr-eval-rows">
+                            <div className="hr-eval-row">
+                              <span>Name</span>
+                              <p>
+                                {evaluationText(
+                                  result.agent_1
+                                    .evaluation,
+                                  "candidate_name",
+                                )}
+                              </p>
+                            </div>
+                            <div className="hr-eval-row">
+                              <span>Email</span>
+                              <p>
+                                {evaluationText(
+                                  result.agent_1
+                                    .evaluation,
+                                  "candidate_email",
+                                )}
+                              </p>
+                            </div>
+                          </div>
+                        </section>
+
+                        <section className="hr-eval-section">
+                          <h3>Role fit</h3>
+                          <div className="hr-eval-rows">
+                            <div className="hr-eval-row">
+                              <span>
+                                Overall suitability
+                              </span>
+                              <p>
+                                {suitabilityLabel(
+                                  evaluationText(
+                                    result.agent_1
+                                      .evaluation,
+                                    "suitability",
+                                    "",
+                                  ),
+                                )}
+                              </p>
+                            </div>
+                            <div className="hr-eval-row">
+                              <span>
+                                Suggested max offer
+                              </span>
+                              <p>
+                                {evaluationText(
+                                  result.agent_1
+                                    .evaluation,
+                                  "recommended_max_offer",
+                                )}
+                              </p>
+                            </div>
+                          </div>
+                        </section>
+
+                        <section className="hr-eval-section">
+                          <h3>Skills summary</h3>
+                          <p className="hr-eval-body">
+                            {evaluationText(
+                              result.agent_1
+                                .evaluation,
+                              "skills_summary",
+                            )}
+                          </p>
+                        </section>
+
+                        <section className="hr-eval-section">
+                          <h3>
+                            Why this recommendation
+                          </h3>
+                          <p className="hr-eval-body">
+                            {evaluationText(
+                              result.agent_1
+                                .evaluation,
+                              "rationale",
+                            )}
+                          </p>
+                        </section>
+
+                        <section className="hr-eval-section">
+                          <h3>Notes for HR</h3>
+                          <p className="hr-eval-body">
+                            {evaluationText(
+                              result.agent_1
+                                .evaluation,
+                              "risk_notes",
+                            )}
+                          </p>
+                        </section>
+                      </div>
                     </div>
 
                     <div className="hr-panel">
@@ -910,7 +1026,51 @@ export default function HrCandidatesPage() {
           font-size: 12px;
         }
 
-        .hr-json,
+        .hr-eval {
+          display: flex;
+          flex-direction: column;
+          gap: 14px;
+        }
+
+        .hr-eval-section {
+          padding: 14px 14px 12px;
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          border-radius: 10px;
+          background: rgba(255, 255, 255, 0.02);
+        }
+
+        .hr-eval-section h3 {
+          margin: 0 0 10px;
+          color: #e8ecf2;
+          font-size: 13px;
+          font-weight: 600;
+          letter-spacing: 0.01em;
+        }
+
+        .hr-eval-rows {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 12px 16px;
+        }
+
+        .hr-eval-row span {
+          display: block;
+          margin-bottom: 4px;
+          color: #8b93a0;
+          font-size: 11px;
+          font-weight: 500;
+        }
+
+        .hr-eval-row p,
+        .hr-eval-body {
+          margin: 0;
+          color: #d5dbe5;
+          font-size: 14px;
+          line-height: 1.5;
+          white-space: pre-wrap;
+          word-break: break-word;
+        }
+
         .hr-email-body {
           margin: 0;
           padding: 12px;
@@ -956,7 +1116,8 @@ export default function HrCandidatesPage() {
         @media (max-width: 980px) {
           .hr-layout,
           .hr-email-split,
-          .hr-meta-grid {
+          .hr-meta-grid,
+          .hr-eval-rows {
             grid-template-columns: 1fr;
           }
 

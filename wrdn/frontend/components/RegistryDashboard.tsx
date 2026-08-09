@@ -109,9 +109,11 @@ function getBucketKey(date: Date, filter: TimeFilter): string {
 export default function RegistryDashboard({
   isAdmin = false,
   clientId = "clientA",
+  username = "",
 }: {
   isAdmin?: boolean;
   clientId?: string;
+  username?: string;
 }) {
   const {
     registryData,
@@ -451,13 +453,19 @@ export default function RegistryDashboard({
             <h1>Live Governance Registry</h1>
 
             <p>
-              Local SQLite audit-log monitoring dashboard
+              {isAdmin
+                ? `Admin scope: all chat/shield activity for client ${clientId}${
+                    username ? ` (signed in as ${username})` : ""
+                  }.`
+                : `Employee scope: only your own shield activity${
+                    username ? ` (${username})` : ""
+                  } on client ${clientId}.`}
             </p>
           </div>
 
           <div className="topbar-right">
             <span className="live-status">
-              Database Connected
+              Registry Live
             </span>
 
             <select
@@ -484,20 +492,21 @@ export default function RegistryDashboard({
           className="cards-grid section-offset"
         >
           <div className="card">
-            <p>Database</p>
+            <p>Workspace</p>
 
-            <h2>
-              {registryData.database_type || "SQLite"}
-            </h2>
+            <h2>{clientId || "—"}</h2>
 
-            <span>Local project database</span>
+            <span>Active client workspace</span>
           </div>
 
           <div className="card">
-            <p>Database Status</p>
+            <p>System status</p>
 
             <h2 className="secure-text">
-              {registryData.database_status}
+              {String(registryData.database_status || "")
+                .toUpperCase() === "ERROR"
+                ? "Check required"
+                : "Online"}
             </h2>
 
             <span>Live registry active</span>
@@ -684,6 +693,7 @@ export default function RegistryDashboard({
               <thead>
                 <tr>
                   <th>Timestamp</th>
+                  <th>User</th>
                   <th>User Prompt</th>
                   <th>AI Output</th>
                   <th>Status</th>
@@ -695,7 +705,7 @@ export default function RegistryDashboard({
                 {calculatedData.filteredAllowed.length ===
                 0 ? (
                   <tr>
-                    <td colSpan={5}>
+                    <td colSpan={6}>
                       No allowed logs found for this time
                       range.
                     </td>
@@ -706,6 +716,10 @@ export default function RegistryDashboard({
                       <tr key={log.id}>
                         <td>
                           {formatDateTime(log.timestamp)}
+                        </td>
+
+                        <td>
+                          {log.username || "—"}
                         </td>
 
                         <td className="long-text">
@@ -751,6 +765,7 @@ export default function RegistryDashboard({
               <thead>
                 <tr>
                   <th>Timestamp</th>
+                  <th>User</th>
                   <th>User Prompt</th>
                   <th>Status</th>
                   <th>Risk Score</th>
@@ -762,7 +777,7 @@ export default function RegistryDashboard({
                 {calculatedData.filteredBlocked.length ===
                 0 ? (
                   <tr>
-                    <td colSpan={5}>
+                    <td colSpan={6}>
                       No blocked logs found for this time
                       range.
                     </td>
@@ -773,6 +788,10 @@ export default function RegistryDashboard({
                       <tr key={log.id}>
                         <td>
                           {formatDateTime(log.timestamp)}
+                        </td>
+
+                        <td>
+                          {log.username || "—"}
                         </td>
 
                         <td className="long-text">
@@ -846,17 +865,27 @@ export default function RegistryDashboard({
 
               <h2>{registryData.audit_count ?? 0}</h2>
 
-              <span>Stored in local SQLite</span>
+              <span>Governance event history</span>
             </div>
 
             <div className="card">
               <p>Protection</p>
 
-              <h2 className="secure-text">
-                ACTIVE
+              <h2
+                className={
+                  protectionEnabled
+                    ? "secure-text"
+                    : "danger-text"
+                }
+              >
+                {protectionEnabled ? "ACTIVE" : "DISABLED"}
               </h2>
 
-              <span>Gemini output monitoring</span>
+              <span>
+                {protectionEnabled
+                  ? "Gemini output monitoring"
+                  : "Shield bypassed for demo"}
+              </span>
             </div>
           </div>
         </section>
@@ -869,42 +898,12 @@ export default function RegistryDashboard({
             <h3>Settings</h3>
 
             <p>
-              Current frontend, backend and database
-              connection information.
+              Non-sensitive workspace preferences and WRDN
+              protection controls.
             </p>
           </div>
 
           <div className="settings-grid">
-            <div className="setting-row">
-              <span>Backend API</span>
-
-              <strong>{API_URL}</strong>
-            </div>
-
-            <div className="setting-row">
-              <span>Registry Endpoint</span>
-
-              <strong>{API_URL}/api/registry</strong>
-            </div>
-
-            <div className="setting-row">
-              <span>Database</span>
-
-              <strong>Local SQLite</strong>
-            </div>
-
-            <div className="setting-row">
-              <span>Refresh Interval</span>
-
-              <strong>3 seconds</strong>
-            </div>
-
-            <div className="setting-row">
-              <span>Selected Time Range</span>
-
-              <strong>{timeFilter}</strong>
-            </div>
-
             <div className="setting-row protection-setting-row">
               <div>
                 <span>WRDN Protection</span>
@@ -944,6 +943,18 @@ export default function RegistryDashboard({
                     : "DISABLED"}
                 </strong>
               )}
+            </div>
+
+            <div className="setting-row">
+              <span>Signed-in role</span>
+              <strong>
+                {isAdmin ? "ADMIN" : "EMPLOYEE"}
+              </strong>
+            </div>
+
+            <div className="setting-row">
+              <span>Application</span>
+              <strong>WRDN Enterprise Prompt Shield</strong>
             </div>
           </div>
         </section>

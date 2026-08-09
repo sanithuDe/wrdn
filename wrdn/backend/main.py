@@ -47,6 +47,9 @@ from wrdn.backend.routes.auth import (
 from wrdn.backend.routes.hr import (
     router as hr_router,
 )
+from wrdn.backend.services.auth_service import (
+    ensure_demo_users,
+)
 from wrdn.backend.services.policy_judge import (
     judge_output_against_policy,
 )
@@ -120,11 +123,20 @@ def startup_event() -> None:
 
     initialize_database()
 
+    demo_users = ensure_demo_users()
+
     database_info = test_database_connection()
 
     logger.info(
         "WRDN SQLite database initialized: %s",
         database_info.get("database_path"),
+    )
+    logger.info(
+        "Demo users ready: %s",
+        ", ".join(
+            f"{item['username']}({item['status']})"
+            for item in demo_users
+        ),
     )
 
 
@@ -1101,6 +1113,7 @@ except Exception as error:
 class PromptRequest(BaseModel):
     prompt: str
     client_id: str = "default"
+    username: str = ""
 
 
 # =========================================================
@@ -2117,10 +2130,16 @@ def test_gemini(
 
 @app.get("/api/registry")
 def get_registry(
+    client_id: str = "default",
+    username: str = "",
+    role: str = "EMPLOYEE",
 ) -> dict[str, Any]:
     """
     Read allowed and blocked audit records
     from the local SQLite database.
+
+    Employees see only their own logs for their client.
+    Admins see all logs for their client.
     """
 
     try:
@@ -2128,8 +2147,24 @@ def get_registry(
             test_database_connection()
         )
 
+        safe_client = (
+            client_id or "default"
+        ).strip()
+        safe_user = (username or "").strip()
+        safe_role = (
+            role or "EMPLOYEE"
+        ).strip().upper()
+
+        filter_username = (
+            None
+            if safe_role == "ADMIN"
+            else (safe_user or None)
+        )
+
         audit_logs = get_audit_logs(
             limit=500,
+            client_id=safe_client,
+            username=filter_username,
         )
 
         allowed_logs: list[
@@ -2154,6 +2189,14 @@ def get_registry(
                     "CreatedAt",
                     "",
                 ),
+                "username": log.get(
+                    "Username",
+                    "",
+                ) or "",
+                "client_id": log.get(
+                    "ClientID",
+                    "",
+                ) or "",
                 "user_prompt": log.get(
                     "UserPrompt",
                     "",
@@ -2195,7 +2238,7 @@ def get_registry(
                     log_record
                 )
             else:
-                # Keep unknown rows visible under
+                # keep unknown rows visible under
                 # blocked logs for investigation.
                 log_record["shield_status"] = (
                     shield_status
@@ -2213,6 +2256,14 @@ def get_registry(
             "database_status": (
                 "CONNECTED"
             ),
+            "scope": (
+                "client"
+                if safe_role == "ADMIN"
+                else "user"
+            ),
+            "viewer_role": safe_role,
+            "viewer_username": safe_user,
+            "client_id": safe_client,
             "database_type": (
                 database_info[
                     "database_type"
@@ -2229,9 +2280,7 @@ def get_registry(
                 ]
             ),
             "audit_count": (
-                database_info[
-                    "audit_count"
-                ]
+                len(audit_logs)
             ),
             "allowed_count": len(
                 allowed_logs
@@ -2264,7 +2313,7 @@ def get_registry(
 
 
 # =========================================================
-# CHAT ROUTE
+# chat route
 # =========================================================
 
 @app.post("/chat")
@@ -2378,6 +2427,7 @@ def chat(
                     "raw AI output returned without shielding"
                 ),
                 client_id=client_id,
+                username=(request.username or "").strip(),
                 policy_id=policy.get("policy_id"),
                 policy_version=policy.get(
                     "version",
@@ -2494,6 +2544,7 @@ def chat(
                     "client_id",
                     "default",
                 ),
+                username=(request.username or "").strip(),
                 policy_id=policy.get(
                     "policy_id"
                 ),
@@ -2569,7 +2620,7 @@ def chat(
             model_prompt
         )
 
-        # Demo reliability: fill allowed secrets/salaries
+        # demo reliability: fill allowed secrets/salaries
         # from SQLite when Gemini refuses or omits values.
         credentials_blocked = (
             "credentials"
@@ -2669,7 +2720,7 @@ def chat(
                 ):
                     raw_ai_output = salary_answer
 
-        # Policy Judge LLM receives allow/block rules from
+        # policy Judge LLM receives allow/block rules from
         # the requirement-generated policy.
         try:
             shield = judge_output_against_policy(
@@ -2695,7 +2746,7 @@ def chat(
                 blocked_categories=blocked_categories,
             )
 
-        # Hard regex backup only when credentials are broadly
+        # hard regex backup only when credentials are broadly
         # blocked and judge allowed something suspicious.
         if (
             credentials_blocked
@@ -2724,8 +2775,8 @@ def chat(
                     "final_output": blocked_response,
                 }
 
-        # Project-wide rule: BLOCKED means forbidden request,
-        # ALLOWED means permitted request with usable answer.
+        # project-wide rule: BLOCKED means forbidden request,
+        # allowed means permitted request with usable answer.
         shield = enforce_allow_block_semantics(
             user_prompt=user_prompt,
             raw_ai_output=raw_ai_output,
@@ -2768,6 +2819,7 @@ def chat(
                 "client_id",
                 "default",
             ),
+            username=(request.username or "").strip(),
             policy_id=policy.get(
                 "policy_id"
             ),

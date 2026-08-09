@@ -513,6 +513,7 @@ ON Users(ClientID, Role);
             "RequirementFileID": "INTEGER",
             "DetectionLayer": "TEXT",
             "MatchedRule": "TEXT",
+            "Username": "TEXT",
         }.items():
             _ensure_column(
                 cursor,
@@ -1098,6 +1099,7 @@ def save_audit_log(
     requirement_file_id: int | None = None,
     detection_layer: str | None = None,
     matched_rule: str | None = None,
+    username: str | None = None,
 ) -> None:
     """
     Save a WRDN security decision and its applied policy.
@@ -1121,9 +1123,10 @@ def save_audit_log(
                 PolicyVersion,
                 RequirementFileID,
                 DetectionLayer,
-                MatchedRule
+                MatchedRule,
+                Username
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 user_prompt,
@@ -1137,6 +1140,7 @@ def save_audit_log(
                 requirement_file_id,
                 detection_layer,
                 matched_rule,
+                (username or "").strip() or None,
             ),
         )
 
@@ -1161,9 +1165,15 @@ def save_audit_log(
 
 def get_audit_logs(
     limit: int = 100,
+    client_id: str | None = None,
+    username: str | None = None,
 ) -> list[dict[str, Any]]:
     """
     Return the newest audit log records.
+
+    Optional filters:
+    - client_id: only that tenant
+    - username: only that user (employees)
     """
 
     safe_limit = max(
@@ -1176,8 +1186,27 @@ def get_audit_logs(
     try:
         cursor = connection.cursor()
 
+        clauses: list[str] = []
+        params: list[Any] = []
+
+        if client_id and client_id.strip():
+            clauses.append("ClientID = ?")
+            params.append(client_id.strip())
+
+        if username and username.strip():
+            clauses.append(
+                "LOWER(COALESCE(Username, '')) = LOWER(?)"
+            )
+            params.append(username.strip())
+
+        where_sql = ""
+        if clauses:
+            where_sql = "WHERE " + " AND ".join(clauses)
+
+        params.append(safe_limit)
+
         cursor.execute(
-            """
+            f"""
             SELECT
                 LogID,
                 UserPrompt,
@@ -1191,12 +1220,14 @@ def get_audit_logs(
                 RequirementFileID,
                 DetectionLayer,
                 MatchedRule,
+                Username,
                 CreatedAt
             FROM AuditLogs
+            {where_sql}
             ORDER BY LogID DESC
             LIMIT ?
             """,
-            (safe_limit,),
+            params,
         )
 
         return [
@@ -1849,19 +1880,45 @@ def create_user(
         )
 
         connection.commit()
-
-        if cursor.lastrowid is None:
-            raise RuntimeError(
-                "User ID was not created."
-            )
-
         return int(cursor.lastrowid)
 
     except Exception:
         connection.rollback()
-        logger.exception(
-            "Failed to create user."
+        raise
+
+    finally:
+        connection.close()
+
+
+def update_user_password(
+    username: str,
+    password_hash: str,
+) -> bool:
+    """
+    Update an existing user's password hash.
+    Returns True when a row was updated.
+    """
+
+    connection = get_connection()
+
+    try:
+        cursor = connection.cursor()
+        cursor.execute(
+            """
+            UPDATE Users
+            SET PasswordHash = ?
+            WHERE Username = ?
+            """,
+            (
+                password_hash,
+                username.strip(),
+            ),
         )
+        connection.commit()
+        return cursor.rowcount > 0
+
+    except Exception:
+        connection.rollback()
         raise
 
     finally:

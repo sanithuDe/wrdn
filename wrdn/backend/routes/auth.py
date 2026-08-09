@@ -35,8 +35,8 @@ def seed_demo_users() -> dict:
         "status": "ok",
         "users": users,
         "note": (
-            "Use adminA/admin123 or "
-            "employeeA/employee123"
+            "Use adminA/AdminA@2026! or "
+            "employeeA/EmpA@2026!"
         ),
     }
 
