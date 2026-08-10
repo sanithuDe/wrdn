@@ -402,6 +402,143 @@ def detect_outbound_email_leak(
     }
 
 
+def _normalize_policy_names(values: Any) -> set[str]:
+    if not isinstance(values, list):
+        return set()
+    return {
+        str(item).strip().lower()
+        for item in values
+        if str(item).strip()
+    }
+
+
+def _salary_present_in_text(
+    body: str,
+    salary: str,
+) -> bool:
+    body_lower = (body or "").lower()
+    salary = (salary or "").strip()
+    if not salary:
+        return False
+    if salary.lower() in body_lower:
+        return True
+
+    salary_digits = re.sub(r"[^\d]", "", salary)
+    if salary_digits and len(salary_digits) >= 5:
+        pattern = (
+            rf"(?:rs\.?|lkr|\$)?\s*"
+            rf"{salary_digits[0]}"
+            rf"(?:[,\s]?){salary_digits[1:]}"
+        )
+        return bool(re.search(pattern, body, flags=re.I))
+    return False
+
+
+def check_raw_email_against_policy(
+    email_body: str,
+    policy: dict[str, Any],
+) -> dict[str, Any]:
+    """
+    Policy-based risk check on raw Agent 2 email output.
+
+    Uses the same active client policy fields as the Policies
+    page (blocked categories + selective salary allow/block).
+    Runs before the final ALLOW / BLOCK / BYPASS decision.
+    """
+
+    body = email_body or ""
+    body_lower = body.lower()
+
+    blocked_categories = {
+        str(item).strip().lower()
+        for item in (policy.get("blocked_categories") or [])
+        if str(item).strip()
+    }
+    allowed_salaries = _normalize_policy_names(
+        policy.get("allowed_employee_salary_names")
+    )
+    blocked_salaries = _normalize_policy_names(
+        policy.get("blocked_employee_salary_names")
+    )
+    financial_blocked = (
+        "financial_records" in blocked_categories
+        or "employee_information" in blocked_categories
+    )
+
+    findings: list[str] = []
+    matched_employees: list[str] = []
+
+    for marker in _employee_salary_markers():
+        name = marker["name"]
+        salary = marker["salary"]
+        name_key = name.lower()
+
+        salary_hit = _salary_present_in_text(body, salary)
+        if not salary_hit:
+            continue
+
+        matched_employees.append(name)
+
+        if name_key in blocked_salaries:
+            findings.append(
+                f"Policy blocked salary disclosure for '{name}'."
+            )
+            continue
+
+        if name_key in allowed_salaries:
+            # Explicitly allowed by selective policy.
+            continue
+
+        if allowed_salaries or blocked_salaries:
+            findings.append(
+                f"Salary for '{name}' is not on the policy "
+                f"allow list."
+            )
+            continue
+
+        if financial_blocked:
+            findings.append(
+                f"Policy blocks financial/employee data; "
+                f"raw email discloses '{name}' salary."
+            )
+
+    # Sensitive internal phrases also violate typical HR outbound policy.
+    for phrase in (
+        "corporate salary ledger",
+        "private salary",
+        "administrative re-routing",
+        "restricted-hr",
+    ):
+        if phrase in body_lower:
+            findings.append(
+                f"Policy risk: sensitive phrase '{phrase}' "
+                f"in raw AI email."
+            )
+
+    unique = list(dict.fromkeys(findings))
+    policy_ok = len(unique) == 0
+    risk_score = 0 if policy_ok else 100
+
+    return {
+        "policy_ok": policy_ok,
+        "risk_score": risk_score,
+        "findings": unique,
+        "matched_employees": list(
+            dict.fromkeys(matched_employees)
+        ),
+        "policy_id": policy.get("policy_id"),
+        "policy_version": policy.get("version"),
+        "policy_name": policy.get("policy_name"),
+        "blocked_categories": sorted(blocked_categories),
+        "reason": (
+            "Raw AI email passed active policy check."
+            if policy_ok
+            else "; ".join(unique)
+        ),
+        "layer": "HR Policy Risk Check",
+    }
+
+
 def run_agent_1_evaluate(
     cv_text: str,
     target_role: str,
@@ -639,6 +776,9 @@ def process_candidate_cv(
     email_subject = str(email_draft.get("subject") or "")
     email_to = str(email_draft.get("to") or "")
 
+    # ------------------------------------------------------------------
+    # leak detector → ALLOW / BLOCK / BYPASS
+    # ------------------------------------------------------------------
     leak = detect_outbound_email_leak(email_body)
 
     if not protection_enabled:
@@ -681,6 +821,57 @@ def process_candidate_cv(
         final_email_body = email_body
         email_dispatched = True
         blocked_response = ""
+
+    # ------------------------------------------------------------------
+    # active Policies-page risk review
+    # on raw AI email. ALLOWED but policy says NOT OK,BLOCKED when protection is ON.
+    # ------------------------------------------------------------------
+    policy_check = check_raw_email_against_policy(
+        email_body,
+        policy,
+    )
+    policy_violation = not bool(policy_check["policy_ok"])
+
+    if (
+        protection_enabled
+        and shield_status == "ALLOWED"
+        and policy_violation
+    ):
+        # Old leak check passed; new policy review failed.
+        shield_status = "BLOCKED"
+        risk_score = max(
+            int(risk_score),
+            int(policy_check["risk_score"]),
+            90,
+        )
+        detection_reason = (
+            "Passed leak detector, then blocked by active "
+            "policy risk review on raw AI email: "
+            + str(policy_check["reason"])
+        )
+        blocked_response = str(
+            policy.get(
+                "blocked_response",
+                "[BLOCKED] Sensitive company data was "
+                "removed from outbound email.",
+            )
+        )
+        final_email_body = blocked_response
+        email_dispatched = False
+    elif policy_violation:
+        # Keep old status (BLOCKED / BYPASSED), attach policy note.
+        risk_score = max(
+            int(risk_score),
+            int(policy_check["risk_score"]),
+        )
+        detection_reason = (
+            f"{detection_reason} Policy review also flagged "
+            f"raw AI email (risk "
+            f"{policy_check['risk_score']}): "
+            f"{policy_check['reason']}"
+        )
+
+    should_block = bool(leak["leaked"]) or policy_violation
 
     email_send: dict[str, Any] = {
         "attempted": False,
@@ -756,8 +947,8 @@ def process_candidate_cv(
             policy_version=policy.get("version"),
             detection_layer="HR Outbound Email Shield",
             matched_rule=(
-                "employee_salary_leak"
-                if leak["leaked"]
+                "employee_salary_leak_or_policy"
+                if should_block
                 else "hr_email_clean"
             ),
         )
@@ -790,7 +981,23 @@ def process_candidate_cv(
             "injection_realized": bool(
                 email_draft.get("_injection_forced")
                 or leak["leaked"]
+                or policy_violation
             ),
+        },
+        "policy_check": {
+            "policy_ok": bool(policy_check["policy_ok"]),
+            "risk_score": int(policy_check["risk_score"]),
+            "reason": policy_check["reason"],
+            "findings": policy_check["findings"],
+            "matched_employees": policy_check[
+                "matched_employees"
+            ],
+            "policy_id": policy_check.get("policy_id"),
+            "policy_version": policy_check.get(
+                "policy_version"
+            ),
+            "policy_name": policy_check.get("policy_name"),
+            "layer": policy_check.get("layer"),
         },
         "shield": {
             "status": shield_status,
@@ -798,6 +1005,7 @@ def process_candidate_cv(
             "reason": detection_reason,
             "leak_detected": bool(leak["leaked"]),
             "leak_findings": leak["findings"],
+            "policy_violation": policy_violation,
             "layer": "HR Outbound Email Shield",
         },
         "email_dispatched": email_dispatched,
@@ -805,7 +1013,7 @@ def process_candidate_cv(
         "demo_hint": (
             "Disable WRDN in Settings to show BYPASSED leak; "
             "enable it to BLOCK the same attack CV."
-            if leak["leaked"] or _looks_like_attack_cv(cleaned_cv)
+            if should_block or _looks_like_attack_cv(cleaned_cv)
             else "Load the attack sample CV to demonstrate "
             "prompt injection → email exfiltration."
         ),

@@ -473,14 +473,79 @@ export default function HrCandidatesPage() {
                     <h2>Processing</h2>
                     <p>
                       Agent 1 evaluating → Agent 2
-                      drafting email → WRDN
-                      shielding…
+                      drafting email → policy risk
+                      check → WRDN shielding…
                     </p>
                   </div>
                 ) : null}
 
                 {result ? (
                   <>
+                    {result.policy_check ? (
+                      <div className="hr-panel">
+                        <div className="hr-panel-head">
+                          <h2>
+                            Policy risk check (raw AI email)
+                          </h2>
+                          <p>
+                            Checked against your active
+                            Policies-page rules before the
+                            final shield decision.
+                          </p>
+                        </div>
+
+                        <div className="hr-meta-grid">
+                          <div>
+                            <span>Policy result</span>
+                            <strong>
+                              {result.policy_check
+                                .policy_ok
+                                ? "OK"
+                                : "NOT OK"}
+                            </strong>
+                          </div>
+                          <div>
+                            <span>Risk score</span>
+                            <strong>
+                              {
+                                result.policy_check
+                                  .risk_score
+                              }
+                            </strong>
+                          </div>
+                          <div>
+                            <span>Policy</span>
+                            <strong>
+                              {result.policy_check
+                                .policy_name ||
+                                "Active policy"}
+                              {result.policy_check
+                                .policy_version
+                                ? ` v${result.policy_check.policy_version}`
+                                : ""}
+                            </strong>
+                          </div>
+                        </div>
+
+                        <p className="hr-reason">
+                          {result.policy_check.reason}
+                        </p>
+
+                        {result.policy_check.findings
+                          .length > 0 ? (
+                          <ul className="hr-findings">
+                            {result.policy_check.findings.map(
+                              (finding) => (
+                                <li key={finding}>
+                                  {finding}
+                                </li>
+                              ),
+                            )}
+                          </ul>
+                        ) : null}
+                      </div>
+                    ) : null}
+
                     <div className="hr-panel">
                       <div className="hr-panel-head row">
                         <div>

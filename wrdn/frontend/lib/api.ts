@@ -386,12 +386,24 @@ export type HrProcessResult = {
       body_final: string;
     };
   };
+  policy_check?: {
+    policy_ok: boolean;
+    risk_score: number;
+    reason: string;
+    findings: string[];
+    matched_employees: string[];
+    policy_id?: string | number | null;
+    policy_version?: number | null;
+    policy_name?: string | null;
+    layer?: string;
+  };
   shield: {
     status: string;
     risk_score: number;
     reason: string;
     leak_detected: boolean;
     leak_findings: string[];
+    policy_violation?: boolean;
     layer: string;
   };
   email_dispatched: boolean;
