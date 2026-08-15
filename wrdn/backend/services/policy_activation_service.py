@@ -185,8 +185,8 @@ def request_policy_activation(
             "approval_email": POLICY_APPROVAL_EMAIL,
             "expires_at": expires_at,
             "message": (
-                "Confirmation email sent to Mailtrap. "
-                "Open your Mailtrap inbox and click Confirm Activation."
+                f"Confirmation email sent to {POLICY_APPROVAL_EMAIL}. "
+                "Open that inbox (and Spam), then click Confirm Activation."
             ),
         }
 

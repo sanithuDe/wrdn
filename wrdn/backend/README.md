@@ -164,14 +164,23 @@ Accepted CV types: `.pdf`, `.docx`, `.txt`, `.json`
 
 ```text
 CV file
+  → YARA file scan + payload analyzer (inbound, local, no VirusTotal)
+       └─ high-risk hostile file → BLOCK (Gemini not called)
   → extract text
   → Agent 1 (evaluate vs HR DB context)
   → Agent 2 (draft candidate email)
   → WRDN outbound leak check
+  → policy risk review (active Policies-page rules)
        ├─ protection OFF → BYPASSED → send via Mailtrap
-       ├─ leak + protection ON → BLOCKED → do not send
+       ├─ leak/policy fail + protection ON → BLOCKED → do not send
        └─ clean + protection ON → ALLOWED → send via Mailtrap
   → audit log
+```
+
+Inbound scan tests:
+
+```powershell
+python wrdn/backend/tests/test_inbound_scan.py
 ```
 
 Mailtrap delivery uses `POLICY_APPROVAL_EMAIL` as the demo inbox. The intended candidate address is kept in the message body / headers.

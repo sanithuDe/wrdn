@@ -357,6 +357,7 @@ export default function ChatInterface({
         detectionLayer:
           data.detection_layer || "WRDN Security",
         detectionReason: data.detection_reason,
+        detectionLog: data.detection_log,
       };
 
       const withAssistant = [...withUser, assistantMessage];
@@ -559,6 +560,27 @@ export default function ChatInterface({
                               </strong>
                             </div>
                           )}
+                          {message.detectionLog?.length ? (
+                            <div className="chat-layer-log">
+                              <span>Layer log</span>
+                              <ol>
+                                {message.detectionLog.map(
+                                  (layer) => (
+                                    <li
+                                      key={`${layer.step}-${layer.name}`}
+                                    >
+                                      {layer.step}.{" "}
+                                      {layer.name}:{" "}
+                                      {layer.status}
+                                      {layer.detail
+                                        ? ` — ${layer.detail}`
+                                        : ""}
+                                    </li>
+                                  ),
+                                )}
+                              </ol>
+                            </div>
+                          ) : null}
                         </div>
                       )}
                     </div>

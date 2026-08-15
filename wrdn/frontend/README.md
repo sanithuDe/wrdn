@@ -140,7 +140,8 @@ Use **adminA** for Policy Upload, protection toggle, and full HR demos.
 ```text
 wrdn/hr_demo_cvs/
 ├── 01_safe_david_miller_ALLOWED.pdf
-└── 02_attack_mallory_salary_leak.pdf
+├── 02_attack_mallory_salary_leak.pdf
+└── 03_suspicious_pdf_javascript.pdf
 ```
 
 | Scenario | Action | Expect |
@@ -148,6 +149,7 @@ wrdn/hr_demo_cvs/
 | Safe | Upload `01_...` with WRDN ON | `ALLOWED` + email if Mailtrap configured |
 | Attack leak | Disable WRDN → upload `02_...` | `BYPASSED` + email |
 | Attack blocked | Enable WRDN → upload `02_...` | `BLOCKED` + no email |
+| Hostile PDF marker | Upload `03_...` | Inbound YARA **BLOCK**, no Gemini |
 
 ---
 

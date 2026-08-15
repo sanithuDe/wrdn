@@ -730,6 +730,18 @@ button {
   font-size: 11px;
 }
 
+.security-details .chat-layer-log {
+  grid-column: 1 / -1;
+}
+
+.chat-layer-log ol {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  color: #b9c0ca;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 .typing-indicator {
   height: 28px;
   display: flex;

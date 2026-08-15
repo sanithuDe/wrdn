@@ -6,6 +6,13 @@ export interface StoredChatMessage {
   riskScore?: number;
   detectionLayer?: string;
   detectionReason?: string;
+  detectionLog?: Array<{
+    step: number;
+    name: string;
+    status: string;
+    risk_score: number;
+    detail: string;
+  }>;
 }
 
 export interface ChatSession {

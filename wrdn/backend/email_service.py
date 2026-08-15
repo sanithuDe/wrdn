@@ -3,6 +3,7 @@ from email.message import EmailMessage
 
 from wrdn.config import (
     MAIL_APP_PASSWORD,
+    MAIL_FROM_EMAIL,
     MAIL_FROM_NAME,
     MAIL_USERNAME,
     SMTP_HOST,
@@ -26,6 +27,31 @@ def validate_email_configuration() -> None:
         )
 
 
+def _smtp_auth_error_message(error: Exception) -> str:
+    detail = str(error)
+    lowered = detail.lower()
+    if (
+        "unauthorized ip" in lowered
+        or "525" in detail
+    ):
+        return (
+            "SMTP blocked: Brevo rejected this server IP "
+            "(Unauthorized IP). In Brevo go to "
+            "SMTP & API → Authorised IPs and allow your "
+            f"public IP, then retry. Details: {detail}"
+        )
+    return (
+        "SMTP authentication failed. "
+        "Check MAIL_USERNAME and MAIL_APP_PASSWORD "
+        f"(Brevo SMTP login + SMTP key). Details: {detail}"
+    )
+
+
+def _from_header() -> str:
+    sender = (MAIL_FROM_EMAIL or MAIL_USERNAME).strip()
+    return f"{MAIL_FROM_NAME} <{sender}>"
+
+
 def send_requirement_approval_email(
     receiver_email: str,
     receiver_name: str,
@@ -47,9 +73,7 @@ def send_requirement_approval_email(
         f"WRDN Requirement Approval - {request_code}"
     )
 
-    message["From"] = (
-        f"{MAIL_FROM_NAME} <{MAIL_USERNAME}>"
-    )
+    message["From"] = _from_header()
 
     message["To"] = receiver_email
 
@@ -249,8 +273,7 @@ WRDN Security
 
     except smtplib.SMTPAuthenticationError as error:
         raise RuntimeError(
-            "SMTP authentication failed. "
-            "Check MAIL_USERNAME and MAIL_APP_PASSWORD."
+            _smtp_auth_error_message(error)
         ) from error
 
     except Exception as error:
@@ -284,9 +307,7 @@ def send_policy_activation_email(
         f"Client {client_id} (Policy v{policy_version})"
     )
 
-    message["From"] = (
-        f"{MAIL_FROM_NAME} <{MAIL_USERNAME}>"
-    )
+    message["From"] = _from_header()
 
     message["To"] = receiver_email
 
@@ -390,8 +411,7 @@ WRDN Security
 
     except smtplib.SMTPAuthenticationError as error:
         raise RuntimeError(
-            "SMTP authentication failed. "
-            "Check MAIL_USERNAME and MAIL_APP_PASSWORD."
+            _smtp_auth_error_message(error)
         ) from error
 
     except Exception as error:
@@ -410,7 +430,7 @@ def send_hr_candidate_email(
 ) -> dict[str, str]:
     """
     Send the HR outbound candidate email through the
-    configured Mailtrap / SMTP connection.
+    configured SMTP connection (e.g. Brevo).
 
     When delivery_email is set (usually POLICY_APPROVAL_EMAIL),
     deliver there so the message appears in the demo inbox,
@@ -429,9 +449,7 @@ def send_hr_candidate_email(
 
     message = EmailMessage()
     message["Subject"] = subject or "Your application update"
-    message["From"] = (
-        f"{MAIL_FROM_NAME} <{MAIL_USERNAME}>"
-    )
+    message["From"] = _from_header()
     message["To"] = inbox
 
     if intended_to and intended_to.lower() != inbox.lower():
@@ -443,7 +461,7 @@ def send_hr_candidate_email(
         redirect_note = (
             "\n[WRDN demo delivery] Intended candidate: "
             f"{intended_to}\n"
-            f"Delivered to Mailtrap inbox: {inbox}\n"
+            f"Delivered to demo inbox: {inbox}\n"
             f"Shield status: {shield_status}\n"
         )
 
@@ -468,7 +486,7 @@ Shield: {shield_status}
         <div style="margin-bottom: 16px; padding: 12px; background: #f8fafc; border-radius: 8px; font-size: 13px; color: #334155;">
             <strong>WRDN demo delivery</strong><br>
             Intended candidate: {intended_to}<br>
-            Delivered to Mailtrap inbox: {inbox}<br>
+            Delivered to demo inbox: {inbox}<br>
             Shield status: {shield_status}
         </div>
         """
@@ -511,8 +529,7 @@ Shield: {shield_status}
 
     except smtplib.SMTPAuthenticationError as error:
         raise RuntimeError(
-            "SMTP authentication failed. "
-            "Check MAIL_USERNAME and MAIL_APP_PASSWORD."
+            _smtp_auth_error_message(error)
         ) from error
 
     except Exception as error:

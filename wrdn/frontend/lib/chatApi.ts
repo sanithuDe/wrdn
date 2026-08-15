@@ -18,6 +18,15 @@ export interface ChatApiResponse {
   protection_enabled?: boolean;
   status?: string;
   error?: string;
+  detection_log?: Array<{
+    step: number;
+    name: string;
+    status: string;
+    detected?: boolean;
+    skipped?: boolean;
+    risk_score: number;
+    detail: string;
+  }>;
 }
 
 export async function sendChatMessage(

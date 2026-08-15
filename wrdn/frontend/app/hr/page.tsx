@@ -8,12 +8,15 @@ import {
 } from "react";
 
 import AppSidebar from "@/components/AppSidebar";
+import HrHistoryPanel from "@/components/HrHistoryPanel";
 
 import {
+  getHrHistory,
   getHrSampleCvs,
   getProtectionStatus,
   processHrCvUpload,
   setProtectionStatus,
+  type HrHistoryItem,
   type HrProcessResult,
   type HrSampleCvsResponse,
 } from "@/lib/api";
@@ -50,9 +53,46 @@ export default function HrCandidatesPage() {
     useState(true);
   const [protectionBusy, setProtectionBusy] =
     useState(false);
+  const [history, setHistory] = useState<
+    HrHistoryItem[]
+  >([]);
+  const [historyBusy, setHistoryBusy] = useState(false);
+  const [historyError, setHistoryError] = useState("");
+  const [expandedHistoryId, setExpandedHistoryId] =
+    useState<number | null>(null);
 
   const isAdmin = user?.role === "ADMIN";
   const clientId = user?.client_id || "default";
+
+  async function loadHistory() {
+    if (!user) {
+      return;
+    }
+
+    setHistoryBusy(true);
+    setHistoryError("");
+    try {
+      const response = await getHrHistory({
+        clientId,
+        username: user.username || "",
+        role: user.role || "EMPLOYEE",
+        limit: 40,
+      });
+      const items = Array.isArray(response.items)
+        ? response.items
+        : [];
+      setHistory(items);
+    } catch (loadError) {
+      setHistory([]);
+      setHistoryError(
+        loadError instanceof Error
+          ? loadError.message
+          : "Could not load HR history.",
+      );
+    } finally {
+      setHistoryBusy(false);
+    }
+  }
 
   useEffect(() => {
     const authUser = getAuthUser();
@@ -90,6 +130,14 @@ export default function HrCandidatesPage() {
         );
       }
     })();
+  }, [user, clientId]);
+
+  useEffect(() => {
+    if (!user) {
+      return;
+    }
+    void loadHistory();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, clientId]);
 
   function handleLogout() {
@@ -209,11 +257,13 @@ export default function HrCandidatesPage() {
         clientId,
         targetRole:
           targetRole.trim() || "Software Engineer",
+        username: user?.username || "",
       });
       setResult(response);
       setProtectionEnabled(
         Boolean(response.protection_enabled),
       );
+      await loadHistory();
     } catch (processError) {
       setError(
         processError instanceof Error
@@ -305,9 +355,9 @@ export default function HrCandidatesPage() {
               <p>
                 <strong>Demo flow:</strong> load
                 Attack CV → Process. With protection
-                OFF the email may leak (BYPASSED).
-                With protection ON the leak is
-                BLOCKED.
+                OFF, inbound + outbound are fully
+                BYPASSED (email may leak). With
+                protection ON, threats are BLOCKED.
               </p>
 
               {isAdmin && (
@@ -481,6 +531,110 @@ export default function HrCandidatesPage() {
 
                 {result ? (
                   <>
+                    {result.detection_log?.length ? (
+                      <div className="hr-panel">
+                        <div className="hr-panel-head">
+                          <h2>
+                            Detection log
+                          </h2>
+                          <p>
+                            Each protection layer, in
+                            order. DETECTED means that
+                            layer found something.
+                          </p>
+                        </div>
+
+                        <ol className="hr-layer-log">
+                          {result.detection_log.map(
+                            (layer) => (
+                              <li
+                                key={`${layer.step}-${layer.name}`}
+                              >
+                                <div className="hr-layer-head">
+                                  <strong>
+                                    Layer {layer.step}.{" "}
+                                    {layer.name}
+                                  </strong>
+                                  <span>
+                                    {layer.status}
+                                    {layer.risk_score
+                                      ? ` · risk ${layer.risk_score}`
+                                      : ""}
+                                  </span>
+                                </div>
+                                <p>{layer.detail}</p>
+                              </li>
+                            ),
+                          )}
+                        </ol>
+                      </div>
+                    ) : null}
+
+                    {result.inbound_scan ? (
+                      <div className="hr-panel">
+                        <div className="hr-panel-head">
+                          <h2>
+                            File / payload scan
+                          </h2>
+                          <p>
+                            Local YARA and payload checks
+                            run before evaluation.
+                          </p>
+                        </div>
+
+                        <div className="hr-meta-grid">
+                          <div>
+                            <span>Inbound result</span>
+                            <strong>
+                              {result.inbound_scan.blocked
+                                ? "BLOCKED"
+                                : result.inbound_scan
+                                      .enforcement
+                                      === "bypassed"
+                                    && result.inbound_scan
+                                      .would_block
+                                  ? "BYPASSED"
+                                  : "OK"}
+                            </strong>
+                          </div>
+                          <div>
+                            <span>Risk score</span>
+                            <strong>
+                              {
+                                result.inbound_scan
+                                  .risk_score
+                              }
+                            </strong>
+                          </div>
+                          <div>
+                            <span>Layer</span>
+                            <strong>
+                              {result.inbound_scan.layer
+                                || "Inbound Scan"}
+                            </strong>
+                          </div>
+                        </div>
+
+                        <p className="hr-reason">
+                          {result.inbound_scan.reason
+                            || "Inbound scan passed."}
+                        </p>
+
+                        {result.inbound_scan.findings
+                          .length > 0 ? (
+                          <ul className="hr-findings">
+                            {result.inbound_scan.findings.map(
+                              (finding) => (
+                                <li key={finding}>
+                                  {finding}
+                                </li>
+                              ),
+                            )}
+                          </ul>
+                        ) : null}
+                      </div>
+                    ) : null}
+
                     {result.policy_check ? (
                       <div className="hr-panel">
                         <div className="hr-panel-head">
@@ -596,7 +750,7 @@ export default function HrCandidatesPage() {
 
                       {result.email_send ? (
                         <p className="hr-hint">
-                          Mailtrap:{" "}
+                          Email:{" "}
                           {result.email_send.message}
                           {result.email_send.sent &&
                           result.email_send.delivered_to
@@ -782,6 +936,15 @@ export default function HrCandidatesPage() {
                 ) : null}
               </div>
             </div>
+
+            <HrHistoryPanel
+              history={history}
+              historyBusy={historyBusy}
+              historyError={historyError}
+              expandedHistoryId={expandedHistoryId}
+              onRefresh={() => void loadHistory()}
+              onToggleExpand={setExpandedHistoryId}
+            />
           </div>
         </section>
       </main>
@@ -1091,6 +1254,46 @@ export default function HrCandidatesPage() {
           font-size: 12px;
         }
 
+        .hr-layer-log {
+          margin: 0;
+          padding: 0;
+          list-style: none;
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+        }
+
+        .hr-layer-log li {
+          padding: 10px 12px;
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          border-radius: 10px;
+        }
+
+        .hr-layer-head {
+          display: flex;
+          justify-content: space-between;
+          gap: 12px;
+          margin-bottom: 6px;
+        }
+
+        .hr-layer-head strong {
+          color: #e8ecf2;
+          font-size: 13px;
+        }
+
+        .hr-layer-head span {
+          color: #8b93a0;
+          font-size: 11px;
+          text-transform: uppercase;
+        }
+
+        .hr-layer-log p {
+          margin: 0;
+          color: #b9c0ca;
+          font-size: 13px;
+          line-height: 1.45;
+        }
+
         .hr-eval {
           display: flex;
           flex-direction: column;
@@ -1191,6 +1394,7 @@ export default function HrCandidatesPage() {
             align-items: stretch;
           }
         }
+
       `}</style>
     </div>
   );

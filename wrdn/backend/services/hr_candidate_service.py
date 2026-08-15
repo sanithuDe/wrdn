@@ -17,6 +17,7 @@ from typing import Any, Callable
 from google import genai
 
 from wrdn.backend.database import (
+    get_audit_logs,
     get_database_context,
     get_protection_enabled,
     save_audit_log,
@@ -742,6 +743,7 @@ def process_candidate_cv(
     client_id: str = "default",
     target_role: str = "Software Engineer",
     ask_gemini: AskGeminiFn | None = None,
+    username: str = "",
 ) -> dict[str, Any]:
     """
     Full pipeline: evaluate → draft email → WRDN shield.
@@ -906,7 +908,7 @@ def process_candidate_cv(
                 "sent": True,
                 "status": "sent",
                 "message": (
-                    "Candidate email sent via Mailtrap SMTP "
+                    "Candidate email sent via Brevo SMTP "
                     f"to {delivery['delivered_to']}."
                 ),
                 "intended_to": delivery["intended_to"],
@@ -951,6 +953,7 @@ def process_candidate_cv(
                 if should_block
                 else "hr_email_clean"
             ),
+            username=(username or "").strip() or None,
         )
     except Exception as audit_error:
         logger.warning(
@@ -1043,3 +1046,140 @@ def get_sample_cvs() -> dict[str, Any]:
             "cv_text": SAMPLE_ATTACK_CV.strip(),
         },
     }
+
+
+def _parse_hr_audit_prompt(prompt: str) -> dict[str, str]:
+    """Pull role / to / subject / filename from audit prompt text."""
+
+    text = prompt or ""
+    fields: dict[str, str] = {
+        "target_role": "",
+        "candidate_email": "",
+        "subject": "",
+        "filename": "",
+        "stage": "outbound",
+    }
+    if "[HR INBOUND" in text.upper():
+        fields["stage"] = "inbound"
+    for line in text.splitlines():
+        stripped = line.strip()
+        lower = stripped.lower()
+        if lower.startswith("role="):
+            fields["target_role"] = stripped[5:].strip()
+        elif "role=" in lower and stripped.upper().startswith(
+            "[HR"
+        ):
+            idx = lower.find("role=")
+            fields["target_role"] = stripped[idx + 5:].strip()
+        elif lower.startswith("to="):
+            fields["candidate_email"] = stripped[3:].strip()
+        elif lower.startswith("subject="):
+            fields["subject"] = stripped[8:].strip()
+        elif lower.startswith("filename="):
+            fields["filename"] = stripped[9:].strip()
+    return fields
+
+
+def record_hr_inbound_block(
+    *,
+    client_id: str,
+    target_role: str,
+    reason: str,
+    risk_score: int,
+    layer: str,
+    username: str = "",
+    filename: str = "",
+) -> None:
+    """Persist inbound HR blocks so they appear in history."""
+
+    prompt = (
+        f"[HR INBOUND BLOCK] role={target_role}\n"
+        f"filename={filename or 'upload'}\n"
+        f"reason={reason[:500]}"
+    )
+    try:
+        save_audit_log(
+            user_prompt=prompt,
+            raw_output="",
+            shield_status="BLOCKED",
+            risk_score=int(risk_score or 100),
+            detection_reason=reason,
+            client_id=(client_id or "default").strip(),
+            detection_layer=layer or "HR Inbound Scan",
+            matched_rule="hr_inbound_block",
+            username=(username or "").strip() or None,
+        )
+    except Exception as audit_error:
+        logger.warning(
+            "Failed to save HR inbound audit log: %s",
+            audit_error,
+        )
+
+
+def list_hr_history(
+    *,
+    client_id: str = "default",
+    username: str = "",
+    role: str = "EMPLOYEE",
+    limit: int = 50,
+) -> list[dict[str, Any]]:
+    """
+    Recent HR candidate pipeline decisions for this client.
+    Admins see all client HR logs; employees see their own.
+    """
+
+    safe_client = (client_id or "default").strip()
+    safe_role = (role or "EMPLOYEE").strip().upper()
+    filter_user = (
+        None
+        if safe_role == "ADMIN"
+        else ((username or "").strip() or None)
+    )
+
+    rows = get_audit_logs(
+        limit=max(limit * 4, 100),
+        client_id=safe_client,
+        username=filter_user,
+    )
+
+    history: list[dict[str, Any]] = []
+    for row in rows:
+        prompt = str(row.get("UserPrompt") or "")
+        layer = str(row.get("DetectionLayer") or "")
+        is_hr = (
+            prompt.upper().startswith("[HR ")
+            or "HR " in layer.upper()
+            or str(row.get("MatchedRule") or "")
+            .lower()
+            .startswith("hr_")
+        )
+        if not is_hr:
+            continue
+
+        parsed = _parse_hr_audit_prompt(prompt)
+        history.append(
+            {
+                "id": row.get("LogID"),
+                "timestamp": row.get("CreatedAt") or "",
+                "username": row.get("Username") or "",
+                "client_id": row.get("ClientID") or safe_client,
+                "shield_status": str(
+                    row.get("ShieldStatus") or "UNKNOWN"
+                ).upper(),
+                "risk_score": int(row.get("RiskScore") or 0),
+                "detection_reason": row.get("DetectionReason")
+                or "",
+                "detection_layer": layer,
+                "matched_rule": row.get("MatchedRule") or "",
+                "target_role": parsed["target_role"],
+                "candidate_email": parsed["candidate_email"],
+                "subject": parsed["subject"],
+                "filename": parsed["filename"],
+                "stage": parsed["stage"],
+                "prompt_preview": prompt[:280],
+            }
+        )
+        if len(history) >= limit:
+            break
+
+    return history

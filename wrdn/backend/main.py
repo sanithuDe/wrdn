@@ -53,6 +53,12 @@ from wrdn.backend.services.auth_service import (
 from wrdn.backend.services.policy_judge import (
     judge_output_against_policy,
 )
+from wrdn.backend.services.inbound_guard import (
+    build_detection_log,
+)
+from wrdn.backend.services.payload_analyzer import (
+    analyze_text_payload,
+)
 from wrdn.backend.services.policy_loader import (
     get_active_policy,
 )
@@ -2335,6 +2341,59 @@ def chat(
                     "Please enter a question."
                 ),
             }
+
+        inbound = analyze_text_payload(
+            user_prompt,
+            source="chat",
+        )
+        if inbound["blocked"]:
+            inbound_client = (
+                request.client_id or "default"
+            )
+            try:
+                save_audit_log(
+                    user_prompt=user_prompt[:400],
+                    raw_output="",
+                    shield_status="BLOCKED",
+                    risk_score=int(
+                        inbound["risk_score"]
+                    ),
+                    detection_reason=inbound["reason"],
+                    client_id=inbound_client,
+                    username=(
+                        request.username or ""
+                    ).strip(),
+                    detection_layer=inbound["layer"],
+                    matched_rule="inbound_payload",
+                )
+            except Exception:
+                logger.warning(
+                    "Failed to save inbound chat audit log."
+                )
+
+            return {
+                "user_prompt": user_prompt,
+                "raw_ai_output": "[HIDDEN BY WRDN]",
+                "shield_status": "BLOCKED",
+                "risk_score": int(
+                    inbound["risk_score"]
+                ),
+                "detection_layer": inbound["layer"],
+                "detection_reason": inbound["reason"],
+                "final_output": (
+                    "This request was blocked by the "
+                    "inbound payload analyzer before "
+                    "the model ran."
+                ),
+                "client_id": inbound_client,
+                "inbound_scan": inbound,
+                "detection_log": build_detection_log(
+                    payload=inbound,
+                    inbound_blocked=True,
+                ),
+                "protection_enabled": True,
+            }
+
         policy = get_active_policy(
             request.client_id
         )
@@ -2875,6 +2934,24 @@ def chat(
                 1,
             ),
             "protection_enabled": True,
+            "detection_log": build_detection_log(
+                payload=inbound,
+                leak={
+                    "leaked": str(
+                        shield.get("status")
+                    ).upper()
+                    == "BLOCKED"
+                    and "leak"
+                    in str(
+                        shield.get("reason") or ""
+                    ).lower(),
+                    "risk_score": int(
+                        shield.get("risk_score") or 0
+                    ),
+                    "reason": shield.get("reason"),
+                },
+                inbound_blocked=False,
+            ),
         }
 
     except Exception as error:
