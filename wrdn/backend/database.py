@@ -1964,6 +1964,196 @@ def get_user_by_username(
         connection.close()
 
 
+def list_users(
+    client_id: str | None = None,
+) -> list[dict[str, Any]]:
+    """
+    List users, optionally filtered by client.
+    """
+
+    connection = get_connection()
+
+    try:
+        cursor = connection.cursor()
+
+        if client_id:
+            cursor.execute(
+                """
+                SELECT
+                    UserID,
+                    Username,
+                    Role,
+                    ClientID,
+                    CreatedAt
+                FROM Users
+                WHERE ClientID = ?
+                ORDER BY
+                    Role ASC,
+                    Username ASC
+                """,
+                (client_id.strip(),),
+            )
+        else:
+            cursor.execute(
+                """
+                SELECT
+                    UserID,
+                    Username,
+                    Role,
+                    ClientID,
+                    CreatedAt
+                FROM Users
+                ORDER BY
+                    ClientID ASC,
+                    Role ASC,
+                    Username ASC
+                """
+            )
+
+        return [dict(row) for row in cursor.fetchall()]
+
+    finally:
+        connection.close()
+
+
+def count_users_by_role(
+    client_id: str,
+    role: str,
+) -> int:
+    connection = get_connection()
+
+    try:
+        cursor = connection.cursor()
+        row = cursor.execute(
+            """
+            SELECT COUNT(*) AS Total
+            FROM Users
+            WHERE ClientID = ?
+              AND Role = ?
+            """,
+            (
+                client_id.strip(),
+                role.strip().upper(),
+            ),
+        ).fetchone()
+        return int(row["Total"] if row else 0)
+
+    finally:
+        connection.close()
+
+
+def delete_user_by_username(username: str) -> bool:
+    """
+    Delete one user by username.
+    Returns True when a row was deleted.
+    """
+
+    connection = get_connection()
+
+    try:
+        cursor = connection.cursor()
+        cursor.execute(
+            """
+            DELETE FROM Users
+            WHERE Username = ?
+            """,
+            (username.strip(),),
+        )
+        connection.commit()
+        return cursor.rowcount > 0
+
+    except Exception:
+        connection.rollback()
+        raise
+
+    finally:
+        connection.close()
+
+
+def delete_all_users() -> int:
+    """
+    Remove every user row. Returns deleted count.
+    """
+
+    connection = get_connection()
+
+    try:
+        cursor = connection.cursor()
+        cursor.execute("SELECT COUNT(*) AS Total FROM Users")
+        total = int(cursor.fetchone()["Total"])
+        cursor.execute("DELETE FROM Users")
+        connection.commit()
+        return total
+
+    except Exception:
+        connection.rollback()
+        raise
+
+    finally:
+        connection.close()
+
+
+def ensure_client_exists(
+    client_id: str,
+    client_name: str | None = None,
+) -> None:
+    """
+    Create a client row when missing.
+    """
+
+    cleaned_id = client_id.strip()
+    if not cleaned_id:
+        raise ValueError("Client ID is required.")
+
+    display_name = (
+        client_name.strip()
+        if client_name and client_name.strip()
+        else cleaned_id
+    )
+
+    connection = get_connection()
+
+    try:
+        cursor = connection.cursor()
+        existing = cursor.execute(
+            """
+            SELECT ClientID
+            FROM Clients
+            WHERE ClientID = ?
+            LIMIT 1
+            """,
+            (cleaned_id,),
+        ).fetchone()
+
+        if existing is not None:
+            return
+
+        cursor.execute(
+            """
+            INSERT INTO Clients (
+                ClientID,
+                ClientName,
+                CreatedAt,
+                ProtectionEnabled
+            )
+            VALUES (?, ?, ?, 1)
+            """,
+            (
+                cleaned_id,
+                display_name,
+                get_current_utc_time(),
+            ),
+        )
+        connection.commit()
+
+    except Exception:
+        connection.rollback()
+        raise
+
+    finally:
+        connection.close()
+
+
 def create_policy_activation_request(
     policy_id: int,
     client_id: str,

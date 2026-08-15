@@ -98,7 +98,7 @@ export default function HrCandidatesPage() {
     const authUser = getAuthUser();
 
     if (!authUser) {
-      router.replace("/login");
+      router.replace("/signin");
       return;
     }
 
@@ -142,7 +142,7 @@ export default function HrCandidatesPage() {
 
   function handleLogout() {
     clearAuthSession();
-    router.push("/login");
+    router.push("/signin");
   }
 
   async function toggleProtection() {

@@ -47,9 +47,6 @@ from wrdn.backend.routes.auth import (
 from wrdn.backend.routes.hr import (
     router as hr_router,
 )
-from wrdn.backend.services.auth_service import (
-    ensure_demo_users,
-)
 from wrdn.backend.services.policy_judge import (
     judge_output_against_policy,
 )
@@ -129,8 +126,6 @@ def startup_event() -> None:
 
     initialize_database()
 
-    demo_users = ensure_demo_users()
-
     database_info = test_database_connection()
 
     logger.info(
@@ -138,11 +133,8 @@ def startup_event() -> None:
         database_info.get("database_path"),
     )
     logger.info(
-        "Demo users ready: %s",
-        ", ".join(
-            f"{item['username']}({item['status']})"
-            for item in demo_users
-        ),
+        "Auth users are created via /signup "
+        "(demo seed is optional: /api/auth/seed-demo)."
     )
 
 

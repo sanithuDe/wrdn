@@ -247,14 +247,14 @@ export default function PoliciesPage() {
 
   function handleLogout() {
     clearAuthSession();
-    router.push("/login");
+    router.push("/signin");
   }
 
   useEffect(() => {
     const currentUser = getAuthUser();
   
     if (!currentUser) {
-      router.push("/login");
+      router.push("/signin");
       return;
     }
   

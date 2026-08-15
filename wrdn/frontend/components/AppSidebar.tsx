@@ -76,6 +76,17 @@ export default function AppSidebar({
             </Link>
           )}
 
+          {isAdmin && (
+            <Link
+              href="/users"
+              className={`nav-link ${
+                activeSection === "settings" ? "active" : ""
+              }`}
+            >
+              Users
+            </Link>
+          )}
+
           <Link
             href="/hr"
             className={`nav-link ${
