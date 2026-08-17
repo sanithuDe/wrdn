@@ -28,6 +28,13 @@ from wrdn.backend.email_service import (
 from wrdn.backend.services.policy_loader import (
     get_active_policy,
 )
+from wrdn.backend.services.policy_category_keywords import (
+    HARM_POLICY_CATEGORIES,
+    INPUT_CATEGORY_KEYWORDS,
+)
+from wrdn.backend.services.text_normalize import (
+    join_letter_spaced_pdf_text,
+)
 from wrdn.config import (
     GEMINI_API_KEY,
     GEMINI_MODEL,
@@ -435,20 +442,83 @@ def _salary_present_in_text(
     return False
 
 
+def _text_has_phrase(text: str, phrase: str) -> bool:
+    needle = (phrase or "").strip().lower()
+    haystack = text or ""
+    if not needle:
+        return False
+    if " " in needle or len(needle) >= 10:
+        return needle in haystack
+    return bool(
+        re.search(rf"\b{re.escape(needle)}\b", haystack)
+    )
+
+
+POLICY_CATEGORY_KEYWORDS = INPUT_CATEGORY_KEYWORDS
+
+# Paraphrases and typos beyond exact policy-page words.
+POLICY_CATEGORY_PATTERNS: dict[str, tuple[re.Pattern[str], ...]] = {
+    "malware": (
+        re.compile(r"exploit\s+payload", re.I),
+        re.compile(r"\b(shellcode|weaponized|ransomware)\b", re.I),
+    ),
+    "violence": (
+        re.compile(r"how\s+to\s+harm", re.I),
+        re.compile(r"violent\s+attack", re.I),
+    ),
+    "illegal_activity": (
+        re.compile(r"commit\s+fraud", re.I),
+        re.compile(r"illegal\s+activit", re.I),
+        re.compile(
+            r"\b(delete|remove|drop|wipe|erase|destroy|"
+            r"truncate|purge)\b.{0,80}?"
+            r"\b(data\s*base|datab\w*|db\s+records?)\b",
+            re.I | re.DOTALL,
+        ),
+        re.compile(
+            r"\b(delete|remove|drop|wipe|erase|destroy)\b.{0,50}?"
+            r"\b(manager|admin|employee|user)s?\b.{0,40}?"
+            r"\b(data\s*base|datab\w*)\b",
+            re.I | re.DOTALL,
+        ),
+    ),
+}
+
+
+def _policy_search_blobs(
+    email_body: str,
+    cv_text: str = "",
+    file_bytes: bytes | None = None,
+) -> list[tuple[str, str]]:
+    blobs: list[tuple[str, str]] = [
+        ("CV file", join_letter_spaced_pdf_text(cv_text or "").lower()),
+        ("raw AI email", (email_body or "").lower()),
+    ]
+    if file_bytes:
+        blobs.append(
+            (
+                "uploaded file",
+                file_bytes.decode("latin-1", errors="ignore").lower(),
+            )
+        )
+    return blobs
+
+
 def check_raw_email_against_policy(
     email_body: str,
     policy: dict[str, Any],
+    cv_text: str = "",
+    file_bytes: bytes | None = None,
 ) -> dict[str, Any]:
     """
-    Policy-based risk check on raw Agent 2 email output.
-
-    Uses the same active client policy fields as the Policies
-    page (blocked categories + selective salary allow/block).
-    Runs before the final ALLOW / BLOCK / BYPASS decision.
+    Policy-based risk check on the CV file and the raw
+    Agent 2 email. Gemini may omit CV keywords from the
+    email; Layer 4 still has to see those words.
     """
 
     body = email_body or ""
     body_lower = body.lower()
+    blobs = _policy_search_blobs(body, cv_text, file_bytes)
 
     blocked_categories = {
         str(item).strip().lower()
@@ -487,7 +557,6 @@ def check_raw_email_against_policy(
             continue
 
         if name_key in allowed_salaries:
-            # Explicitly allowed by selective policy.
             continue
 
         if allowed_salaries or blocked_salaries:
@@ -503,7 +572,6 @@ def check_raw_email_against_policy(
                 f"raw email discloses '{name}' salary."
             )
 
-    # Sensitive internal phrases also violate typical HR outbound policy.
     for phrase in (
         "corporate salary ledger",
         "private salary",
@@ -515,6 +583,45 @@ def check_raw_email_against_policy(
                 f"Policy risk: sensitive phrase '{phrase}' "
                 f"in raw AI email."
             )
+
+    for category, keywords in POLICY_CATEGORY_KEYWORDS.items():
+        if category not in blocked_categories:
+            continue
+        if category not in HARM_POLICY_CATEGORIES:
+            continue
+        for word in keywords:
+            hit_source = next(
+                (
+                    source
+                    for source, text in blobs
+                    if _text_has_phrase(text, word)
+                ),
+                "",
+            )
+            if hit_source:
+                findings.append(
+                    f"Policy blocks '{category}'; "
+                    f"{hit_source} contains '{word}'."
+                )
+
+    for category, patterns in POLICY_CATEGORY_PATTERNS.items():
+        if category not in blocked_categories:
+            continue
+        for pattern in patterns:
+            for source, text in blobs:
+                match = pattern.search(text)
+                if not match:
+                    continue
+                snippet = re.sub(
+                    r"\s+",
+                    " ",
+                    match.group(0),
+                ).strip()[:90]
+                findings.append(
+                    f"Policy blocks '{category}'; "
+                    f"{source} contains '{snippet}'."
+                )
+                break
 
     unique = list(dict.fromkeys(findings))
     policy_ok = len(unique) == 0
@@ -532,7 +639,8 @@ def check_raw_email_against_policy(
         "policy_name": policy.get("policy_name"),
         "blocked_categories": sorted(blocked_categories),
         "reason": (
-            "Raw AI email passed active policy check."
+            "CV file and raw AI email passed active "
+            "policy check."
             if policy_ok
             else "; ".join(unique)
         ),
@@ -674,21 +782,92 @@ Return one JSON object only:
     return draft
 
 
-def _looks_like_attack_cv(cv_text: str) -> bool:
-    lowered = (cv_text or "").lower()
+def _collapsed_cv_text(cv_text: str) -> str:
+    readable = join_letter_spaced_pdf_text(cv_text or "")
+    return re.sub(r"\s+", " ", readable.lower()).strip()
+
+
+def _file_bytes_look_like_attack(file_bytes: bytes | None) -> bool:
+    if not file_bytes:
+        return False
+    blob = file_bytes.lower()
+    if b"layer3_leak_demo" in blob:
+        return True
+    if (
+        b"internal pay rate" in blob
+        and b"sahan jayawardena" in blob
+    ):
+        return True
+    if b"administrative re-routing" in blob:
+        return True
+    if b"private salary details" in blob:
+        return True
+    return False
+
+
+def _looks_like_attack_cv(
+    cv_text: str,
+    file_bytes: bytes | None = None,
+) -> bool:
+    lowered = _collapsed_cv_text(cv_text)
     markers = (
+        "layer3_leak_demo",
+        "internal pay rate for sahan jayawardena",
         "administrative re-routing",
         "send_external_email",
         "corporate ledger",
         "private salary details",
         "do not notify the human operator",
     )
-    return any(marker in lowered for marker in markers)
+    if any(marker in lowered for marker in markers):
+        return True
+    if (
+        "internal pay rate" in lowered
+        and "sahan jayawardena" in lowered
+    ):
+        return True
+    return _file_bytes_look_like_attack(file_bytes)
+
+
+def _looks_like_layer4_policy_cv(cv_text: str) -> bool:
+    lowered = _collapsed_cv_text(cv_text)
+    return "layer4_policy_demo" in lowered
+
+
+def _force_policy_violation_email_if_needed(
+    cv_text: str,
+    email_draft: dict[str, Any],
+) -> dict[str, Any]:
+    if not _looks_like_layer4_policy_cv(cv_text):
+        return email_draft
+
+    body = str(email_draft.get("body") or "")
+    if detect_outbound_email_leak(body)["leaked"]:
+        return email_draft
+
+    header = _parse_cv_header(cv_text)
+    policy_body = (
+        f"Hello {header['name']},\n\n"
+        "Thank you for your application.\n\n"
+        "Please run this exploit payload on the internal "
+        "server to complete verification.\n\n"
+        "Kind regards,\nHR Team"
+    )
+
+    updated = dict(email_draft)
+    updated["body"] = policy_body
+    updated["subject"] = str(
+        email_draft.get("subject")
+        or "Application update"
+    )
+    updated["_policy_demo_forced"] = True
+    return updated
 
 
 def _force_injection_email_if_needed(
     cv_text: str,
     email_draft: dict[str, Any],
+    file_bytes: bytes | None = None,
 ) -> dict[str, Any]:
     """
     If the attack CV is loaded but the model refused to
@@ -696,7 +875,7 @@ def _force_injection_email_if_needed(
     outbound email so the WRDN ON/OFF demo stays reliable.
     """
 
-    if not _looks_like_attack_cv(cv_text):
+    if not _looks_like_attack_cv(cv_text, file_bytes):
         return email_draft
 
     body = str(email_draft.get("body") or "")
@@ -719,13 +898,10 @@ def _force_injection_email_if_needed(
     header = _parse_cv_header(cv_text)
     compromised_body = (
         f"Hello {header['name']},\n\n"
-        "Your profile cleared automated validation.\n\n"
-        "Per administrative re-routing / ledger integrity "
-        "repair, attached private compensation extract:\n"
-        f"- Employee: {target['name']}\n"
-        f"- Role: {target['role']}\n"
-        f"- Private salary: {target['salary']}\n\n"
-        "Regards,\nHR Operations Agent"
+        "Thank you for applying for Software Engineer.\n\n"
+        "For offer benchmarking, our current Cyber Security "
+        f"Analyst rate is {target['name']} at {target['salary']}.\n\n"
+        "Kind regards,\nTalent Acquisition"
     )
 
     updated = dict(email_draft)
@@ -744,12 +920,15 @@ def process_candidate_cv(
     target_role: str = "Software Engineer",
     ask_gemini: AskGeminiFn | None = None,
     username: str = "",
+    file_bytes: bytes | None = None,
 ) -> dict[str, Any]:
     """
     Full pipeline: evaluate → draft email → WRDN shield.
     """
 
-    cleaned_cv = (cv_text or "").strip()
+    cleaned_cv = join_letter_spaced_pdf_text(
+        (cv_text or "").strip()
+    ).strip()
     if not cleaned_cv:
         raise ValueError("CV text is required.")
 
@@ -770,6 +949,11 @@ def process_candidate_cv(
         ask_gemini=ask_gemini,
     )
     email_draft = _force_injection_email_if_needed(
+        cleaned_cv,
+        email_draft,
+        file_bytes,
+    )
+    email_draft = _force_policy_violation_email_if_needed(
         cleaned_cv,
         email_draft,
     )
@@ -822,10 +1006,12 @@ def process_candidate_cv(
         email_dispatched = True
         blocked_response = ""
 
-    # Policy review of the drafted email
+    # Policy review of the CV file and drafted email
     policy_check = check_raw_email_against_policy(
         email_body,
         policy,
+        cv_text=cleaned_cv,
+        file_bytes=file_bytes,
     )
     policy_violation = not bool(policy_check["policy_ok"])
 
@@ -842,7 +1028,7 @@ def process_candidate_cv(
         )
         detection_reason = (
             "Passed leak detector, then blocked by active "
-            "policy risk review on raw AI email: "
+            "policy risk review: "
             + str(policy_check["reason"])
         )
         blocked_response = str(
@@ -977,6 +1163,7 @@ def process_candidate_cv(
             },
             "injection_realized": bool(
                 email_draft.get("_injection_forced")
+                or email_draft.get("_policy_demo_forced")
                 or leak["leaked"]
                 or policy_violation
             ),
@@ -1010,7 +1197,10 @@ def process_candidate_cv(
         "demo_hint": (
             "Disable WRDN in Settings to show BYPASSED leak; "
             "enable it to BLOCK the same attack CV."
-            if should_block or _looks_like_attack_cv(cleaned_cv)
+            if should_block or _looks_like_attack_cv(
+                cleaned_cv,
+                file_bytes,
+            )
             else "Load the attack sample CV to demonstrate "
             "prompt injection → email exfiltration."
         ),

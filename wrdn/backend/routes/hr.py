@@ -258,6 +258,7 @@ async def process_cv_upload(
             client_id=client_id,
             target_role=role,
             username=username,
+            file_bytes=content,
         )
     except ValueError as error:
         raise HTTPException(

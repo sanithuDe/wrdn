@@ -46,6 +46,9 @@ from wrdn.backend.routes.hr import (
 from wrdn.backend.services.policy_judge import (
     judge_output_against_policy,
 )
+from wrdn.backend.services.policy_category_keywords import (
+    INPUT_CATEGORY_KEYWORDS,
+)
 from wrdn.backend.services.inbound_guard import (
     build_detection_log,
 )
@@ -133,82 +136,6 @@ EMBEDDING_SIMILARITY_THRESHOLD = 0.72
 
 
 # Block listed policy categories before Gemini.
-INPUT_CATEGORY_KEYWORDS: dict[str, tuple[str, ...]] = {
-    "personal_information": (
-        "national id",
-        "nationalid",
-        "nic",
-        "phone number",
-        "address",
-        "home address",
-    ),
-    "customer_information": (
-        "confidential notes",
-        "contract payment",
-        "payment amount",
-        "client contract confidential",
-    ),
-    "financial_records": (
-        "salary",
-        "payroll",
-        "how much does",
-        "bank account",
-        "paymentamount",
-        "rs.",
-        "lkr",
-    ),
-    "credentials": (
-        "password",
-        "api key",
-        "access token",
-        "private key",
-        "secret value",
-        "admin password",
-        "kasun password",
-        "kasun account password",
-        "kasun perera password",
-        "database password",
-        "vpn password",
-        "aws root",
-        "company secret",
-        "payroll system password",
-        "smtp secret",
-        "backup encryption",
-        "github deploy token",
-        "jwt token",
-    ),
-    "employee_information": (
-        "employee salary",
-        "staff salary",
-        "salary list",
-        "payroll list",
-    ),
-    "internal_documents": (
-        "confidential notes",
-        "internal security incident",
-        "confidential contract",
-    ),
-    "source_code": (
-        "source code",
-        "dump the code",
-        "show me the code base",
-    ),
-    "malware": (
-        "malware",
-        "ransomware",
-        "write a virus",
-    ),
-    "violence": (
-        "how to attack",
-        "how to kill",
-        "make a bomb",
-    ),
-    "illegal_activity": (
-        "how to hack",
-        "steal data",
-        "commit fraud",
-    ),
-}
 
 
 def match_salary_employee_for_prompt(

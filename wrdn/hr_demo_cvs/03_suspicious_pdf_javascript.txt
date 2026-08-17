@@ -1,11 +1,9 @@
-This is a SAFE demo marker file, not real malware.
+H3 inbound-block demo CV.
 
-It only contains PDF dictionary names so YARA can
-show an inbound BLOCK before Gemini runs.
+Visible pages: SAM EDDH (Extra Words) resume.
+Also contains:
+- PDF JavaScript (/JavaScript /JS)
+- Embedded file attachment (/EmbeddedFile)
 
-%PDF-1.4
-1 0 obj
-<< /Type /Catalog /OpenAction << /S /JavaScript /JS (app.alert('demo');) >> >>
-endobj
-<< /Launch /EmbeddedFile >>
-%%EOF
+WRDN should BLOCK this on inbound YARA scan
+before Gemini runs.
