@@ -4,9 +4,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 
-# =========================================================
 # PROJECT PATHS
-# =========================================================
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 ENV_FILE = PROJECT_ROOT / ".env"
@@ -14,9 +12,7 @@ ENV_FILE = PROJECT_ROOT / ".env"
 load_dotenv(dotenv_path=ENV_FILE)
 
 
-# =========================================================
 # GEMINI CONFIGURATION
-# =========================================================
 
 GEMINI_API_KEY = os.getenv(
     "GEMINI_API_KEY",
@@ -34,9 +30,7 @@ GEMINI_EMBED_MODEL = os.getenv(
 ).strip()
 
 
-# =========================================================
 # EMAIL CONFIGURATION
-# =========================================================
 
 MAIL_USERNAME = os.getenv(
     "MAIL_USERNAME",
@@ -53,7 +47,7 @@ MAIL_FROM_NAME = os.getenv(
     "WRDN Security",
 ).strip()
 
-# Verified sender address (Brevo/Gmail). Falls back to SMTP login.
+# Verified sender. Falls back to SMTP login.
 MAIL_FROM_EMAIL = os.getenv(
     "MAIL_FROM_EMAIL",
     "",
@@ -61,7 +55,7 @@ MAIL_FROM_EMAIL = os.getenv(
 
 SMTP_HOST = os.getenv(
     "SMTP_HOST",
-    "smtp.gmail.com",
+    "smtp-relay.brevo.com",
 ).strip()
 
 SMTP_PORT = int(
@@ -72,9 +66,7 @@ SMTP_PORT = int(
 )
 
 
-# =========================================================
 # APPLICATION URLS
-# =========================================================
 
 BACKEND_URL = os.getenv(
     "BACKEND_URL",
@@ -87,9 +79,7 @@ FRONTEND_URL = os.getenv(
 ).rstrip("/")
 
 
-# =========================================================
 # REQUIREMENT APPROVAL CONFIGURATION
-# =========================================================
 
 APPROVAL_EXPIRE_MINUTES = int(
     os.getenv(
@@ -112,9 +102,7 @@ MAX_REQUIREMENT_FILE_SIZE_BYTES = (
 )
 
 
-# =========================================================
 # POLICY ACTIVATION EMAIL CONFIRMATION
-# =========================================================
 
 POLICY_APPROVAL_EMAIL = os.getenv(
     "POLICY_APPROVAL_EMAIL",

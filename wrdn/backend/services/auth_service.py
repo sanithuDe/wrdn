@@ -17,8 +17,6 @@ from wrdn.backend.database import (
 )
 
 
-# Temporary in-memory sessions for demo.
-# Key = token, value = user info
 ACTIVE_SESSIONS: dict[str, dict[str, Any]] = {}
 
 
@@ -61,7 +59,6 @@ def verify_password(
     )
 
 
-# Common demo typos → real seeded usernames.
 DEMO_USERNAME_ALIASES = {
     "admin": "adminA",
     "employee": "employeeA",
@@ -381,7 +378,6 @@ def register_user(
             "Username is already taken."
         )
 
-    # Security: never trust public role after bootstrap.
     if count_all_users() == 0:
         normalized_role = "ADMIN"
     else:
@@ -414,7 +410,6 @@ def register_user(
     }
 
 
-# Keep old name for any older imports.
 def register_employee(
     username: str,
     password: str,
@@ -559,7 +554,6 @@ def delete_managed_user(
     if not deleted:
         raise ValueError("User not found.")
 
-    # Drop any live sessions for the deleted user.
     stale_tokens = [
         token
         for token, session in ACTIVE_SESSIONS.items()

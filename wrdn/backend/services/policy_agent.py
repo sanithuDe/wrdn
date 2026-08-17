@@ -166,8 +166,7 @@ def generate_policy(
         response_text
     )
 
-    # Deterministic correction: fill/fix selective lists
-    # from the requirement text when Gemini misses them.
+    # Fill selective lists from the requirement text if Gemini misses them.
     policy = enrich_policy_from_requirement(
         policy,
         requirement_text,

@@ -3,7 +3,7 @@
 Optional **terminal** demo that shows how an HR-style Gemini agent can be tricked by prompt injection inside a CV, and how WRDN-style output checks can block a leaky outbound email.
 
 This simulator is **separate** from the main web app.  
-For the full product UI (upload PDF, agents, Mailtrap, protection toggle), use **HR Candidates** in the frontend — see the [root README](../../README.md).
+For the full product UI (upload PDF, agents, Brevo email, protection toggle), use **HR Candidates** in the frontend — see the [root README](../../README.md).
 
 ---
 
@@ -87,7 +87,7 @@ Press **ENTER** when prompted to step through:
 The script may call a local sanitizer endpoint (historically `http://127.0.0.1:8000/sanitize`).
 
 - For the **main WRDN app**, the protected HR flow lives at backend port **18000** under `/api/hr/...`.
-- This simulator is a **standalone teaching tool**. Prefer the web HR page for the current end-to-end demo with Docker + Mailtrap.
+- This simulator is a **standalone teaching tool**. Prefer the web HR page for the current end-to-end demo with Docker + Brevo.
 
 ### Sample inputs
 

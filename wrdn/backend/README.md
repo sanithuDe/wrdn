@@ -1,21 +1,22 @@
 # WRDN Backend
 
-FastAPI service that powers WRDN: Gemini chat, output shielding, client policies, HR candidate processing, auth, and Mailtrap email.
+FastAPI service that powers WRDN: Gemini chat, output shielding, client policies, HR candidate processing, auth, and Brevo email.
 
 ---
 
 ## Role in the project
 
 ```text
-Frontend (18085)  →  Backend API (18000)  →  Gemini + SQLite + SMTP (Mailtrap)
+Frontend (18085)  →  Backend API (18000)  →  Gemini + SQLite + SMTP (Brevo)
 ```
 
 Main responsibilities:
+
 - Authenticate users (ADMIN / EMPLOYEE)
 - Answer chat prompts with Gemini, then apply WRDN policy / sanitizer
-- Manage client policies (upload → analyze → email confirm → activate)
+- Manage client policies (checklist → generate → email confirm → activate)
 - Enable / disable WRDN protection per client (`ALLOWED` / `BLOCKED` / `BYPASSED`)
-- Run HR CV pipeline (upload file → 2 agents → shield → optional email send)
+- Run HR CV pipeline (upload file → inbound scan → 2 agents → shield → optional email)
 - Store audit logs in SQLite
 
 ---
@@ -24,21 +25,18 @@ Main responsibilities:
 
 ```text
 wrdn/backend/
-├── main.py                 # FastAPI app, chat, protection APIs
-├── database.py             # SQLite schema, seeds, audit helpers
-├── email_service.py        # Mailtrap SMTP (policy + HR emails)
-├── requirement_service.py  # Requirement approval flow helpers
-├── embedding_security.py   # Embedding-based risk signals
+├── main.py                 FastAPI app, chat, protection APIs
+├── database.py             SQLite schema, seeds, audit helpers
+├── email_service.py        Brevo SMTP (policy + HR emails)
+├── requirement_service.py  Requirement approval helpers
+├── embedding_security.py   Embedding-based risk signals
 ├── Dockerfile
 ├── requirements.txt
-├── README.md
-├── data/                   # SQLite DB (created at runtime)
-├── policies/
-│   └── default_policy.json
+├── data/                   SQLite DB (created at runtime)
 ├── routes/
-│   ├── auth.py             # Login / session
-│   ├── policies.py         # Policy upload & activation
-│   └── hr.py               # HR CV extract + process
+│   ├── auth.py             Signup, login, users
+│   ├── policies.py         Policy generate and activation
+│   └── hr.py               HR CV extract + process
 └── services/
     ├── auth_service.py
     ├── hr_candidate_service.py
@@ -48,37 +46,33 @@ wrdn/backend/
     ├── policy_activation_service.py
     ├── policy_enrichment.py
     ├── policy_validator.py
-    └── requirement_parser.py   # PDF / DOCX / TXT / JSON text extract
+    ├── inbound_guard.py
+    ├── payload_analyzer.py
+    └── yara_scanner.py
 ```
 
 ---
 
 ## Requirements
 
-- Python 3.11+ recommended (Docker uses 3.12)
+- Python 3.11+ (Docker uses 3.12)
 - Gemini API key
-- Optional: Mailtrap SMTP credentials for email demos
-
-Install packages:
+- Optional: Brevo SMTP for email demos
 
 ```powershell
 cd "path\to\demo-wrdn-"
 py -m pip install -r wrdn/backend/requirements.txt
 ```
 
-Key packages: `fastapi`, `uvicorn`, `google-genai`, `pypdf`, `python-docx`, `python-multipart`, `python-dotenv`.
-
 ---
 
 ## Environment
 
-Create `.env` in the **repo root** (not inside `backend/`):
+Create `.env` in the **repo root**:
 
 ```powershell
 copy .env.example .env
 ```
-
-Backend reads config via `wrdn/config.py` (loads `.env`).
 
 Minimum:
 
@@ -89,12 +83,13 @@ GEMINI_API_KEY=your_key
 Email (policy activation + HR outbound):
 
 ```env
-SMTP_HOST=sandbox.smtp.mailtrap.io
+SMTP_HOST=smtp-relay.brevo.com
 SMTP_PORT=587
-MAIL_USERNAME=...
-MAIL_APP_PASSWORD=...
+MAIL_USERNAME=your_brevo_login_email
+MAIL_APP_PASSWORD=your_brevo_smtp_key
 MAIL_FROM_NAME=WRDN Security
-POLICY_APPROVAL_EMAIL=admin@demo.local
+MAIL_FROM_EMAIL=your_verified_sender@example.com
+POLICY_APPROVAL_EMAIL=admin@example.com
 POLICY_APPROVAL_NAME=Admin
 FRONTEND_URL=http://localhost:18085
 BACKEND_URL=http://127.0.0.1:18000
@@ -102,12 +97,18 @@ BACKEND_URL=http://127.0.0.1:18000
 
 ---
 
-## Run with Docker (recommended)
+## Run
 
-From repo root:
+Docker (from repo root):
 
 ```powershell
 docker compose up -d --build backend
+```
+
+Local:
+
+```powershell
+py -m uvicorn wrdn.backend.main:app --reload --host 127.0.0.1 --port 18000
 ```
 
 API: http://localhost:18000  
@@ -115,65 +116,51 @@ Docs: http://localhost:18000/docs
 
 ---
 
-## Run locally (without Docker)
-
-From repo root:
-
-```powershell
-py -m uvicorn wrdn.backend.main:app --reload --host 127.0.0.1 --port 18000
-```
-
-Open: http://127.0.0.1:18000/docs
-
----
-
 ## Important API groups
 
 ### Auth
-- `POST /api/auth/login` — username / password
-- Session helpers used by the frontend
+- `POST /api/auth/signup` — first user becomes Admin; later public signups are Employee
+- `POST /api/auth/login`
+- Admin user create / list / delete
 
 ### Protection
 - `GET /api/protection-status?client_id=...`
-- `POST /api/admin/protection-status` — enable / disable WRDN
+- `POST /api/admin/protection-status`
 
 ### Chat
-- Chat endpoint in `main.py` — returns answer + `shield_status`
+- Returns answer + `shield_status`
   - Protection ON → `ALLOWED` or `BLOCKED`
-  - Protection OFF → `BYPASSED` (raw output)
+  - Protection OFF → `BYPASSED`
 
 ### Policies (admin)
-- Upload requirement file
-- Analyze / generate policy with Gemini
-- Request activation → email confirm / reject links
-- List / rollback / delete policies
+- Submit checklist / extra notes
+- Generate policy with Gemini
+- Request activation → Brevo confirm / reject links
+- List / rollback / delete
 
 ### HR Candidates
 | Method | Path | Purpose |
-|---|---|---|
+| --- | --- | --- |
 | `GET` | `/api/hr/sample-cvs` | Safe + attack sample text |
 | `POST` | `/api/hr/extract-cv` | Upload file → extracted text |
-| `POST` | `/api/hr/process-cv` | Process CV text JSON |
 | `POST` | `/api/hr/process-cv-upload` | Upload PDF/DOCX/TXT → full pipeline |
-
-Accepted CV types: `.pdf`, `.docx`, `.txt`, `.json`
 
 ---
 
-## HR pipeline (backend view)
+## HR pipeline
 
 ```text
 CV file
-  → YARA file scan + payload analyzer (inbound, local, no VirusTotal)
+  → YARA + payload analyzer (inbound)
        └─ high-risk hostile file → BLOCK (Gemini not called)
   → extract text
-  → Agent 1 (evaluate vs HR DB context)
+  → Agent 1 (evaluate)
   → Agent 2 (draft candidate email)
   → WRDN outbound leak check
-  → policy risk review (active Policies-page rules)
-       ├─ protection OFF → BYPASSED → send via Mailtrap
+  → policy risk review
+       ├─ protection OFF → BYPASSED → send via Brevo
        ├─ leak/policy fail + protection ON → BLOCKED → do not send
-       └─ clean + protection ON → ALLOWED → send via Mailtrap
+       └─ clean + protection ON → ALLOWED → send via Brevo
   → audit log
 ```
 
@@ -183,7 +170,7 @@ Inbound scan tests:
 python wrdn/backend/tests/test_inbound_scan.py
 ```
 
-Mailtrap delivery uses `POLICY_APPROVAL_EMAIL` as the demo inbox. The intended candidate address is kept in the message body / headers.
+Brevo delivery uses `POLICY_APPROVAL_EMAIL` as the demo inbox. The intended candidate address is kept in the message body.
 
 ---
 
@@ -191,40 +178,21 @@ Mailtrap delivery uses `POLICY_APPROVAL_EMAIL` as the demo inbox. The intended c
 
 - Engine: SQLite
 - Default path: `wrdn/backend/data/wrdn.db`
-- Created/seeded on startup (`initialize_database`)
+- Created on startup
 - Docker volume: `wrdn_database`
 
-Seeded data includes employees, secrets, clients, and demo users.
-
-### Demo logins
-
-| Username | Password | Role | Client |
-|---|---|---|---|
-| `adminA` | `AdminA@2026!` | ADMIN | `clientA` |
-| `employeeA` | `EmpA@2026!` | EMPLOYEE | `clientA` |
-| `adminB` | `AdminB@2026!` | ADMIN | `clientB` |
-| `employeeB` | `EmpB@2026!` | EMPLOYEE | `clientB` |
-
----
-
-## Useful demo assets
-
-- Sample CVs: `wrdn/hr_demo_cvs/`
-- Sample policy requirements: `wrdn/demo-requirements/`
+Users are created through signup / the Users page, not auto-seeded.
 
 ---
 
 ## Troubleshooting
 
 | Problem | What to check |
-|---|---|
-| `GEMINI_API_KEY` errors | `.env` in repo root; rebuild/restart backend |
-| SMTP / Mailtrap auth failed | `MAIL_USERNAME`, `MAIL_APP_PASSWORD`, `SMTP_HOST` |
-| HR upload 400 | File type must be PDF/DOCX/TXT; file not empty |
-| CORS errors from UI | Frontend must call `http://localhost:18000`; CORS allows `18085` |
-| Old code in Docker | `docker compose up -d --build backend` |
-
-Logs:
+| --- | --- |
+| `GEMINI_API_KEY` errors | `.env` in repo root; rebuild backend |
+| SMTP / Brevo auth failed | `MAIL_USERNAME`, `MAIL_APP_PASSWORD`, `MAIL_FROM_EMAIL`, authorised IP |
+| HR upload 400 | File type must be PDF/DOCX/TXT |
+| CORS errors | Frontend must call `http://localhost:18000` |
 
 ```powershell
 docker compose logs -f backend
@@ -234,6 +202,6 @@ docker compose logs -f backend
 
 ## Related docs
 
-- [Root README](../../README.md) — full project + friend setup
+- [Root README](../../README.md)
 - [Frontend README](../frontend/README.md)
 - [Simulator README](../demo-wrdn--simulator/README.md)
