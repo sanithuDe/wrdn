@@ -53,6 +53,12 @@ MAIL_FROM_NAME = os.getenv(
     "WRDN Security",
 ).strip()
 
+# Verified sender address (Brevo/Gmail). Falls back to SMTP login.
+MAIL_FROM_EMAIL = os.getenv(
+    "MAIL_FROM_EMAIL",
+    "",
+).strip()
+
 SMTP_HOST = os.getenv(
     "SMTP_HOST",
     "smtp.gmail.com",
@@ -119,6 +125,12 @@ POLICY_APPROVAL_NAME = os.getenv(
     "POLICY_APPROVAL_NAME",
     "Admin",
 ).strip()
+
+# If MAIL_FROM_EMAIL is empty, use approval email then SMTP login.
+if not MAIL_FROM_EMAIL:
+    MAIL_FROM_EMAIL = (
+        POLICY_APPROVAL_EMAIL or MAIL_USERNAME
+    )
 
 POLICY_ACTIVATION_EXPIRE_MINUTES = int(
     os.getenv(

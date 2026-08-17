@@ -78,23 +78,27 @@ export default function Home() {
   function handleSelectChat(chatId: string) {
     setActiveSection("chat");
     setActiveChatId(chatId);
-    // Re-trigger load even when selecting the same chat.
-    setLoadChatId(null);
-    window.setTimeout(() => {
-      setLoadChatId(chatId);
-    }, 0);
+    if (loadChatId === chatId) {
+      setLoadChatId(null);
+      window.setTimeout(() => {
+        setLoadChatId(chatId);
+      }, 0);
+      return;
+    }
+
+    setLoadChatId(chatId);
   }
 
   function handleLogout() {
     clearAuthSession();
-    router.push("/login");
+    router.push("/signin");
   }
 
   useEffect(() => {
     const currentUser = getAuthUser();
 
     if (!currentUser) {
-      router.push("/login");
+      router.push("/signin");
       return;
     }
 
@@ -135,13 +139,14 @@ export default function Home() {
     if (
       activeSection === "chat" ||
       activeSection === "policies" ||
-      activeSection === "hr"
+      activeSection === "hr" ||
+      activeSection === "users"
     ) {
       return;
     }
 
     const sectionMap: Record<
-      Exclude<AppSection, "chat" | "policies" | "hr">,
+      Exclude<AppSection, "chat" | "policies" | "hr" | "users">,
       string
     > = {
       dashboard: "overview-section",
@@ -189,7 +194,11 @@ export default function Home() {
         onLogout={handleLogout}
       />
 
-      <main className="application-content">
+      <main
+        className={`application-content${
+          isChat ? " chat-view" : ""
+        }`}
+      >
         {isChat ? (
           <ChatInterface
             resetSignal={resetSignal}

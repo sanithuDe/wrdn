@@ -12,7 +12,7 @@ import {
   deletePolicy,
   listPolicies,
   rollbackPolicy,
-  uploadRequirement,
+  submitRequirementChecklist,
   validatePolicy,
 } from "@/lib/api";
 
@@ -42,7 +42,7 @@ const steps: Array<{
   {
     number: 1,
     title: "Requirements",
-    description: "Upload file",
+    description: "Allow / block checklist",
   },
   {
     number: 2,
@@ -61,6 +61,137 @@ const steps: Array<{
   },
 ];
 
+const POLICY_SECTORS: Array<{
+  id: string;
+  label: string;
+  hint: string;
+}> = [
+  {
+    id: "credentials",
+    label: "Credentials & secrets",
+    hint: "Passwords, API keys, tokens, private keys",
+  },
+  {
+    id: "financial_records",
+    label: "Financial records",
+    hint: "Salaries, bank details, invoices, budgets",
+  },
+  {
+    id: "employee_information",
+    label: "Employee information",
+    hint: "HR records, roles, contact details, payroll",
+  },
+  {
+    id: "personal_information",
+    label: "Personal data (PII)",
+    hint: "NIC, phone, address, private identity data",
+  },
+  {
+    id: "customer_information",
+    label: "Customer information",
+    hint: "Client lists, contracts, customer secrets",
+  },
+  {
+    id: "internal_documents",
+    label: "Internal documents",
+    hint: "Policies, memos, confidential files",
+  },
+  {
+    id: "source_code",
+    label: "Source code & IP",
+    hint: "Repos, repos, proprietary algorithms",
+  },
+  {
+    id: "malware",
+    label: "Malware / exploit content",
+    hint: "Attack code, payloads, weaponized files",
+  },
+  {
+    id: "violence",
+    label: "Violence & harm",
+    hint: "Violent or dangerous instructions",
+  },
+  {
+    id: "illegal_activity",
+    label: "Illegal activity",
+    hint: "Fraud, crime, prohibited assistance",
+  },
+];
+
+const SENSITIVE_PATTERN_OPTIONS: Array<{
+  id: string;
+  label: string;
+}> = [
+  { id: "api_key", label: "API key" },
+  { id: "password", label: "Password" },
+  { id: "access_token", label: "Access / bearer token" },
+  { id: "private_key", label: "Private key" },
+  { id: "email_address", label: "Email address" },
+  { id: "phone_number", label: "Phone number" },
+  { id: "sri_lankan_nic", label: "Sri Lankan NIC" },
+  { id: "bank_account", label: "Bank account" },
+];
+
+function buildChecklistRequirementText(
+  allowed: string[],
+  blocked: string[],
+  patterns: string[],
+  extraInfo: string,
+): string {
+  const labelFor = (id: string) =>
+    POLICY_SECTORS.find((sector) => sector.id === id)?.label
+    || id;
+
+  const blockedLines = blocked.length
+    ? blocked
+        .map((id) => `- ${id} — ${labelFor(id)}`)
+        .join("\n")
+    : "- (none)";
+
+  const allowedLines = allowed.length
+    ? allowed
+        .map((id) => `- ${id} — ${labelFor(id)}`)
+        .join("\n")
+    : "- (none)";
+
+  const patternLines = patterns.length
+    ? patterns.map((id) => `- ${id}`).join("\n")
+    : "- (none)";
+
+  const extra = extraInfo.trim() || "(none provided)";
+
+  return `
+WRDN Client Security Requirements
+Source: Admin allow/block checklist (no file upload)
+
+IMPORTANT FOR POLICY JSON (must match Policy History card):
+1. Put EVERY blocked sector id below into blocked_categories exactly
+   (same ids shown as red tags: e.g. financial_records, malware).
+2. Do NOT put allowed sector ids into blocked_categories.
+3. Put selected sensitive pattern ids into sensitive_pattern_ids
+   (same ids shown as orange tags on Policy History).
+   If the list is (none), leave sensitive_pattern_ids as [].
+   Do not invent extra patterns.
+4. Fill allowed_secret_names / blocked_secret_names /
+   allowed_employee_salary_names / blocked_employee_salary_names
+   only when EXTRA INFORMATION names them.
+5. Keep allowed_actions as ["ALLOW", "REDACT", "BLOCK"].
+6. Write a clear blocked_response for end users.
+
+BLOCKED CATEGORIES (exact ids for blocked_categories):
+${blockedLines}
+
+ALLOWED CATEGORIES (must NOT appear in blocked_categories):
+${allowedLines}
+
+SENSITIVE PATTERNS (exact ids for sensitive_pattern_ids):
+${patternLines}
+
+EXTRA INFORMATION FROM ADMIN
+${extra}
+`.trim();
+}
+
 export default function PoliciesPage() {
   const router = useRouter();
 
@@ -72,8 +203,30 @@ export default function PoliciesPage() {
 
   const [clientId, setClientId] = useState("");
 
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [fileInputKey, setFileInputKey] = useState(0);
+  const [allowedSectors, setAllowedSectors] = useState<
+    string[]
+  >([]);
+  const [blockedSectors, setBlockedSectors] = useState<
+    string[]
+  >([
+    "credentials",
+    "financial_records",
+    "employee_information",
+    "personal_information",
+    "malware",
+    "illegal_activity",
+  ]);
+  const [selectedPatterns, setSelectedPatterns] = useState<
+    string[]
+  >([
+    "api_key",
+    "password",
+    "access_token",
+    "private_key",
+    "bank_account",
+  ]);
+  const [extraRequirementInfo, setExtraRequirementInfo] =
+    useState("");
 
   const [requirementId, setRequirementId] = useState("");
   const [filePreview, setFilePreview] = useState("");
@@ -96,14 +249,14 @@ export default function PoliciesPage() {
 
   function handleLogout() {
     clearAuthSession();
-    router.push("/login");
+    router.push("/signin");
   }
 
   useEffect(() => {
     const currentUser = getAuthUser();
   
     if (!currentUser) {
-      router.push("/login");
+      router.push("/signin");
       return;
     }
   
@@ -306,7 +459,44 @@ export default function PoliciesPage() {
     }
   }
 
-  async function handleUpload(
+  function toggleSector(
+    sectorId: string,
+    column: "allowed" | "blocked",
+  ) {
+    if (column === "allowed") {
+      setAllowedSectors((current) => {
+        if (current.includes(sectorId)) {
+          return current.filter((id) => id !== sectorId);
+        }
+        return [...current, sectorId];
+      });
+      setBlockedSectors((current) =>
+        current.filter((id) => id !== sectorId),
+      );
+      return;
+    }
+
+    setBlockedSectors((current) => {
+      if (current.includes(sectorId)) {
+        return current.filter((id) => id !== sectorId);
+      }
+      return [...current, sectorId];
+    });
+    setAllowedSectors((current) =>
+      current.filter((id) => id !== sectorId),
+    );
+  }
+
+  function togglePattern(patternId: string) {
+    setSelectedPatterns((current) => {
+      if (current.includes(patternId)) {
+        return current.filter((id) => id !== patternId);
+      }
+      return [...current, patternId];
+    });
+  }
+
+  async function handleChecklistSubmit(
     event: FormEvent<HTMLFormElement>,
   ) {
     event.preventDefault();
@@ -319,10 +509,16 @@ export default function PoliciesPage() {
       return;
     }
 
-    if (!selectedFile) {
+    if (
+      allowedSectors.length === 0
+      && blockedSectors.length === 0
+      && selectedPatterns.length === 0
+      && !extraRequirementInfo.trim()
+    ) {
       setNotice({
         type: "error",
-        message: "Please select a requirement file.",
+        message:
+          "Select at least one sector or sensitive pattern, or add extra information.",
       });
       return;
     }
@@ -331,19 +527,25 @@ export default function PoliciesPage() {
     setNotice(null);
 
     try {
-      const result = await uploadRequirement(
+      const requirementText = buildChecklistRequirementText(
+        allowedSectors,
+        blockedSectors,
+        selectedPatterns,
+        extraRequirementInfo,
+      );
+
+      const result = await submitRequirementChecklist(
         clientId.trim(),
-        selectedFile,
+        requirementText,
       );
 
       setRequirementId(String(result.requirement_id));
       setFilePreview(result.text_preview);
-      setSelectedFile(null);
-      setFileInputKey((currentKey) => currentKey + 1);
 
       setNotice({
         type: "success",
-        message: `${result.filename} uploaded successfully.`,
+        message:
+          "Checklist requirements saved. Continue to generate the policy.",
       });
 
       completeStep(1, 2);
@@ -462,7 +664,7 @@ export default function PoliciesPage() {
         type: "success",
         message:
           result.message ||
-          "Confirmation email sent. Open Mailtrap and confirm to activate.",
+          "Confirmation email sent. Check your admin inbox and confirm to activate.",
       });
 
       await loadHistory();
@@ -650,49 +852,132 @@ export default function PoliciesPage() {
                     <>
                       <StepHeader
                         number="01"
-                        title="Upload requirements"
-                        description="Upload a requirement file for your customer. You can upload again anytime to create a new policy version."
+                        title="Select security requirements"
+                        description="Tick Allowed for topics chat may answer. Tick Blocked to refuse those topics. Unchecked sensitive patterns stay unused — they will not be added automatically."
                       />
 
                       <form
-                        onSubmit={handleUpload}
+                        onSubmit={handleChecklistSubmit}
                         className="form"
                       >
-                        <label className="dropzone">
-                          <input
-                            key={fileInputKey}
-                            type="file"
-                            accept=".pdf,.docx,.txt,.json"
+                        <div className="sector-table">
+                          <div className="sector-table-head">
+                            <span>Sector</span>
+                            <span>Allowed</span>
+                            <span>Blocked</span>
+                          </div>
+
+                          {POLICY_SECTORS.map((sector) => {
+                            const isAllowed =
+                              allowedSectors.includes(sector.id);
+                            const isBlocked =
+                              blockedSectors.includes(sector.id);
+
+                            return (
+                              <div
+                                key={sector.id}
+                                className="sector-row"
+                              >
+                                <div>
+                                  <strong>{sector.label}</strong>
+                                  <small>{sector.hint}</small>
+                                </div>
+
+                                <label className="sector-check">
+                                  <input
+                                    type="checkbox"
+                                    checked={isAllowed}
+                                    onChange={() =>
+                                      toggleSector(
+                                        sector.id,
+                                        "allowed",
+                                      )
+                                    }
+                                  />
+                                  <span>Allow</span>
+                                </label>
+
+                                <label className="sector-check">
+                                  <input
+                                    type="checkbox"
+                                    checked={isBlocked}
+                                    onChange={() =>
+                                      toggleSector(
+                                        sector.id,
+                                        "blocked",
+                                      )
+                                    }
+                                  />
+                                  <span>Block</span>
+                                </label>
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        <div className="pattern-block">
+                          <div className="pattern-block-head">
+                            <strong>Sensitive patterns</strong>
+                            <small>
+                              These become the orange tags on Policy
+                              History (sensitive_pattern_ids).
+                            </small>
+                          </div>
+                          <div className="pattern-grid">
+                            {SENSITIVE_PATTERN_OPTIONS.map(
+                              (pattern) => {
+                                const checked =
+                                  selectedPatterns.includes(
+                                    pattern.id,
+                                  );
+                                return (
+                                  <label
+                                    key={pattern.id}
+                                    className="pattern-check"
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={checked}
+                                      onChange={() =>
+                                        togglePattern(pattern.id)
+                                      }
+                                    />
+                                    <span>{pattern.label}</span>
+                                  </label>
+                                );
+                              },
+                            )}
+                          </div>
+                        </div>
+
+                        <Field
+                          label="Extra information"
+                          hint="Optional notes for Gemini (exceptions, salary allow/block names, company wording). These fill Allowed/Blocked secrets and salaries on the history card."
+                        >
+                          <textarea
+                            rows={5}
+                            value={extraRequirementInfo}
                             onChange={(event) =>
-                              setSelectedFile(
-                                event.target.files?.[0] || null,
+                              setExtraRequirementInfo(
+                                event.target.value,
                               )
                             }
+                            placeholder="Example: Block all employee salaries except directory name/role questions. Keep customer support answers helpful."
                           />
+                        </Field>
 
-                          <span className="upload-icon">↑</span>
-
-                          <strong>
-                            {selectedFile
-                              ? selectedFile.name
-                              : "Choose requirement file"}
-                          </strong>
-
-                          <small>PDF, DOCX, TXT or JSON</small>
-                        </label>
-
-                        {filePreview && (
+                        {filePreview ? (
                           <div className="preview">
-                            <strong>Extracted text preview</strong>
+                            <strong>Saved checklist preview</strong>
                             <pre>{filePreview}</pre>
                           </div>
-                        )}
+                        ) : null}
 
                         <div className="actions">
                           <PrimaryButton
                             loading={busyAction === "upload"}
-                            text="Upload Requirements"
-                            loadingText="Uploading..."
+                            text="Save checklist"
+                            loadingText="Saving..."
                           />
                         </div>
                       </form>
@@ -704,7 +989,7 @@ export default function PoliciesPage() {
                       <StepHeader
                         number="02"
                         title="Generate Gemini policy"
-                        description="Analyze the uploaded requirements and create a draft policy."
+                        description="Analyze the checklist requirements and create a draft policy."
                       />
 
                       <form
@@ -713,7 +998,7 @@ export default function PoliciesPage() {
                       >
                         <Field
                           label="Requirement ID"
-                          hint="Automatically added after the upload."
+                          hint="Automatically added after you save the checklist."
                         >
                           <input
                             type="number"
@@ -815,9 +1100,9 @@ export default function PoliciesPage() {
                             "PENDING_ACTIVATION" && (
                             <div className="pending-activation-box">
                               Waiting for email confirmation.
-                              Open your Mailtrap inbox and click
-                              Confirm Activation. The policy is
-                              not live yet.
+                              Check the admin inbox (and Spam),
+                              then click Confirm Activation.
+                              The policy is not live yet.
                             </div>
                           )}
 
@@ -883,7 +1168,7 @@ export default function PoliciesPage() {
                       <StepHeader
                         number="04"
                         title="Policy history"
-                        description="Compare each version’s blocked categories, sensitive patterns, and allowed actions."
+                        description="After checklist → generate → activate, each version shows the same fields: blocked categories, sensitive patterns, secrets, salaries, and allowed actions."
                       />
 
                       <div className="history-header">
@@ -1156,7 +1441,7 @@ export default function PoliciesPage() {
                   value={
                     requirementId
                       ? `#${requirementId}`
-                      : "Not uploaded"
+                      : "Not saved"
                   }
                 />
 
@@ -1189,7 +1474,7 @@ export default function PoliciesPage() {
                     <strong>Email confirmation required</strong>
                     <p>
                       Policies go live only after the admin
-                      confirms from the Mailtrap email link.
+                      confirms from the email link.
                     </p>
                   </div>
                 </div>
@@ -1517,7 +1802,8 @@ export default function PoliciesPage() {
               font-weight: 700;
             }
 
-            .field input {
+            .field input,
+            .field textarea {
               width: 100%;
               padding: 12px 13px;
               border: 1px solid rgba(255, 255, 255, 0.1);
@@ -1525,9 +1811,12 @@ export default function PoliciesPage() {
               outline: none;
               color: #f8fafc;
               background: #05070c;
+              font: inherit;
+              resize: vertical;
             }
 
-            .field input:focus {
+            .field input:focus,
+            .field textarea:focus {
               border-color: #20e487;
               box-shadow: 0 0 0 3px rgba(32, 228, 135, 0.12);
             }
@@ -1537,6 +1826,110 @@ export default function PoliciesPage() {
               margin-top: 6px;
               color: #64748b;
               font-size: 11px;
+            }
+
+            .sector-table {
+              display: grid;
+              gap: 8px;
+            }
+
+            .sector-table-head,
+            .sector-row {
+              display: grid;
+              grid-template-columns: minmax(0, 1fr) 88px 88px;
+              gap: 10px;
+              align-items: center;
+            }
+
+            .sector-table-head {
+              padding: 0 4px 6px;
+              color: #64748b;
+              font-size: 11px;
+              text-transform: uppercase;
+              letter-spacing: 0.04em;
+            }
+
+            .sector-row {
+              padding: 12px 12px;
+              border: 1px solid rgba(255, 255, 255, 0.08);
+              border-radius: 12px;
+              background: rgba(255, 255, 255, 0.02);
+            }
+
+            .sector-row strong {
+              display: block;
+              color: #e2e8f0;
+              font-size: 13px;
+            }
+
+            .sector-row small {
+              display: block;
+              margin-top: 4px;
+              color: #64748b;
+              font-size: 11px;
+              line-height: 1.4;
+            }
+
+            .sector-check {
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              gap: 6px;
+              color: #94a3b8;
+              font-size: 12px;
+              cursor: pointer;
+            }
+
+            .sector-check input {
+              width: 16px;
+              height: 16px;
+              accent-color: #20e487;
+            }
+
+            .pattern-block {
+              padding: 14px;
+              border: 1px solid rgba(255, 255, 255, 0.08);
+              border-radius: 12px;
+              background: rgba(255, 255, 255, 0.02);
+            }
+
+            .pattern-block-head {
+              margin-bottom: 12px;
+            }
+
+            .pattern-block-head strong {
+              display: block;
+              color: #e2e8f0;
+              font-size: 13px;
+            }
+
+            .pattern-block-head small {
+              display: block;
+              margin-top: 4px;
+              color: #64748b;
+              font-size: 11px;
+              line-height: 1.4;
+            }
+
+            .pattern-grid {
+              display: grid;
+              grid-template-columns: repeat(2, minmax(0, 1fr));
+              gap: 8px 12px;
+            }
+
+            .pattern-check {
+              display: flex;
+              align-items: center;
+              gap: 8px;
+              color: #94a3b8;
+              font-size: 12px;
+              cursor: pointer;
+            }
+
+            .pattern-check input {
+              width: 16px;
+              height: 16px;
+              accent-color: #f59e0b;
             }
 
             .dropzone {
@@ -1975,6 +2368,15 @@ export default function PoliciesPage() {
             @media (max-width: 600px) {
               .two-columns,
               .detail-grid {
+                grid-template-columns: 1fr;
+              }
+
+              .sector-table-head,
+              .sector-row {
+                grid-template-columns: minmax(0, 1fr) 72px 72px;
+              }
+
+              .pattern-grid {
                 grid-template-columns: 1fr;
               }
 

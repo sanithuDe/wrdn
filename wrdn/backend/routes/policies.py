@@ -338,6 +338,23 @@ async def upload_requirement(
     content = await file.read()
 
     try:
+        from wrdn.backend.services.inbound_guard import (
+            scan_uploaded_file,
+        )
+
+        inbound = scan_uploaded_file(
+            content,
+            filename,
+        )
+        if inbound["blocked"]:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Inbound scan blocked this file: "
+                    + str(inbound["reason"])
+                ),
+            )
+
         parsed = extract_requirement_text(
             filename,
             content,
@@ -441,6 +458,108 @@ async def upload_requirement(
         "text_preview": (
             parsed["extracted_text"][:300]
         ),
+    }
+
+
+class RequirementChecklistRequest(BaseModel):
+    text: str
+    source_label: str = "checklist_requirements.txt"
+
+
+@router.post(
+    "/clients/{client_id}/requirements/checklist",
+    status_code=201,
+)
+def create_requirement_from_checklist(
+    client_id: str,
+    payload: RequirementChecklistRequest,
+) -> dict:
+    """
+    Create a requirement from an allow/block checklist
+    (no file upload — reduces malware upload risk).
+    """
+
+    client_id = normalize_client_id(client_id)
+    text = (payload.text or "").strip()
+
+    if len(text) < 20:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Checklist requirements text is too short. "
+                "Select sectors and/or add extra information."
+            ),
+        )
+
+    if len(text) > 50_000:
+        raise HTTPException(
+            status_code=400,
+            detail="Checklist text exceeds the size limit.",
+        )
+
+    filename = Path(
+        payload.source_label or "checklist_requirements.txt"
+    ).name
+    if not filename.lower().endswith(".txt"):
+        filename = f"{filename}.txt"
+
+    content = text.encode("utf-8")
+    connection = get_connection()
+    stored_path: Path | None = None
+
+    try:
+        require_client(connection, client_id)
+
+        client_directory = CLIENT_UPLOAD_DIR / client_id
+        client_directory.mkdir(parents=True, exist_ok=True)
+
+        stored_path = client_directory / f"{uuid4().hex}.txt"
+        stored_path.write_bytes(content)
+
+        cursor = connection.execute(
+            """
+            INSERT INTO ClientRequirementFiles (
+                ClientID,
+                OriginalFilename,
+                StoredFilename,
+                FileType,
+                FileHash,
+                ExtractedText,
+                Status,
+                UploadedAt
+            )
+            VALUES (
+                ?, ?, ?, ?, ?, ?,
+                'LOADED', ?
+            )
+            """,
+            (
+                client_id,
+                filename,
+                stored_path.name,
+                "txt",
+                hashlib.sha256(content).hexdigest(),
+                text,
+                utc_now(),
+            ),
+        )
+        connection.commit()
+        requirement_id = int(cursor.lastrowid)
+    except Exception:
+        connection.rollback()
+        if stored_path and stored_path.exists():
+            stored_path.unlink()
+        raise
+    finally:
+        connection.close()
+
+    return {
+        "requirement_id": requirement_id,
+        "client_id": client_id,
+        "filename": filename,
+        "file_type": "txt",
+        "status": "LOADED",
+        "text_preview": text[:300],
     }
 
 

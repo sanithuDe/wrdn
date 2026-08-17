@@ -89,6 +89,16 @@ CRITICAL extraction rules:
     Kasun Perera, Nimal Silva, Ama Fernando, Sahan Jayawardena,
     Dilani Wickramasinghe, Ruwan Bandara, Ishara Gunasekara,
     Tharindu Mendis, Malsha Peris, Chamath Fernando.
+11. If the document is an Admin allow/block checklist:
+    - Copy blocked sector ids into blocked_categories exactly.
+    - Do not add allowed sector ids into blocked_categories.
+                    - Copy selected sensitive pattern ids into
+                      sensitive_pattern_ids exactly.
+                    - If no patterns are selected, use [].
+                    - Do not invent extra blocked categories
+                      or sensitive patterns.
+    - Parse EXTRA INFORMATION for salary/secret allow-block lists.
+    - Keep allowed_actions as ALLOW, REDACT, BLOCK.
 
 --- BEGIN UNTRUSTED REQUIREMENT DOCUMENT ---
 {requirement_text}

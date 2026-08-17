@@ -144,6 +144,7 @@ export default function ChatInterface({
   function persistMessages(
     nextMessages: ChatMessage[],
     id = sessionIdRef.current,
+    options: { silent?: boolean } = {},
   ) {
     const ctx = getChatCtx();
     if (!ctx) {
@@ -151,24 +152,35 @@ export default function ChatInterface({
     }
 
     if (viewOnlyOwner) {
-      publishHistory(loadVisibleChatSessions(ctx), id);
+      if (!options.silent) {
+        publishHistory(loadVisibleChatSessions(ctx), id);
+      }
       return loadVisibleChatSessions(ctx);
     }
 
     if (nextMessages.length === 0) {
-      publishHistory(loadVisibleChatSessions(ctx), id);
+      if (!options.silent) {
+        publishHistory(loadVisibleChatSessions(ctx), id);
+      }
       return loadVisibleChatSessions(ctx);
     }
 
+    const existing = getChatSessionById(id, ctx);
     const session: ChatSession = {
       id,
       title: getChatSessionTitle(nextMessages),
+      createdAt:
+        existing?.createdAt || existing?.updatedAt,
       updatedAt: new Date().toISOString(),
       messages: nextMessages,
     };
 
     const sessions = upsertChatSession(session, ctx);
-    publishHistory(sessions, id);
+    if (options.silent) {
+      onHistoryChange?.(sessions);
+    } else {
+      publishHistory(sessions, id);
+    }
     return sessions;
   }
 
@@ -220,6 +232,7 @@ export default function ChatInterface({
       persistMessages(
         messagesRef.current,
         sessionIdRef.current,
+        { silent: true },
       );
     }
 
@@ -357,6 +370,7 @@ export default function ChatInterface({
         detectionLayer:
           data.detection_layer || "WRDN Security",
         detectionReason: data.detection_reason,
+        detectionLog: data.detection_log,
       };
 
       const withAssistant = [...withUser, assistantMessage];
@@ -559,6 +573,27 @@ export default function ChatInterface({
                               </strong>
                             </div>
                           )}
+                          {message.detectionLog?.length ? (
+                            <div className="chat-layer-log">
+                              <span>Layer log</span>
+                              <ol>
+                                {message.detectionLog.map(
+                                  (layer) => (
+                                    <li
+                                      key={`${layer.step}-${layer.name}`}
+                                    >
+                                      {layer.step}.{" "}
+                                      {layer.name}:{" "}
+                                      {layer.status}
+                                      {layer.detail
+                                        ? ` — ${layer.detail}`
+                                        : ""}
+                                    </li>
+                                  ),
+                                )}
+                              </ol>
+                            </div>
+                          ) : null}
                         </div>
                       )}
                     </div>
@@ -666,7 +701,9 @@ export default function ChatInterface({
                         onSelectChat?.(chat.id)
                       }
                     >
-                      {chat.title}
+                      <span className="chat-history-item-title">
+                        {chat.title}
+                      </span>
                     </button>
                   ))
               )}

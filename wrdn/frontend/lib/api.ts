@@ -196,6 +196,24 @@ export async function uploadRequirement(
   );
 }
 
+export async function submitRequirementChecklist(
+  clientId: string,
+  text: string,
+): Promise<RequirementUploadResponse> {
+  return apiFetch<RequirementUploadResponse>(
+    `/api/admin/clients/${encodeURIComponent(
+      clientId,
+    )}/requirements/checklist`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        text,
+        source_label: "checklist_requirements.txt",
+      }),
+    },
+  );
+}
+
 export async function analyzeRequirement(
   requirementId: number,
   clientId: string,
@@ -386,12 +404,24 @@ export type HrProcessResult = {
       body_final: string;
     };
   };
+  policy_check?: {
+    policy_ok: boolean;
+    risk_score: number;
+    reason: string;
+    findings: string[];
+    matched_employees: string[];
+    policy_id?: string | number | null;
+    policy_version?: number | null;
+    policy_name?: string | null;
+    layer?: string;
+  };
   shield: {
     status: string;
     risk_score: number;
     reason: string;
     leak_detected: boolean;
     leak_findings: string[];
+    policy_violation?: boolean;
     layer: string;
   };
   email_dispatched: boolean;
@@ -404,6 +434,26 @@ export type HrProcessResult = {
     delivered_to: string;
     subject?: string;
   };
+  inbound_scan?: {
+    ok: boolean;
+    blocked: boolean;
+    would_block?: boolean;
+    enforcement?: string;
+    risk_score: number;
+    findings: string[];
+    layer?: string;
+    reason?: string;
+    engine?: string;
+  };
+  detection_log?: Array<{
+    step: number;
+    name: string;
+    status: string;
+    detected: boolean;
+    skipped: boolean;
+    risk_score: number;
+    detail: string;
+  }>;
   demo_hint: string;
 };
 
@@ -458,6 +508,7 @@ export async function processHrCvUpload(input: {
   file: File;
   clientId: string;
   targetRole?: string;
+  username?: string;
 }): Promise<HrProcessResult> {
   const formData = new FormData();
   formData.append("file", input.file);
@@ -466,6 +517,7 @@ export async function processHrCvUpload(input: {
     "target_role",
     input.targetRole || "Software Engineer",
   );
+  formData.append("username", input.username || "");
 
   return apiFetch<HrProcessResult>(
     "/api/hr/process-cv-upload",
@@ -473,5 +525,47 @@ export async function processHrCvUpload(input: {
       method: "POST",
       body: formData,
     },
+  );
+}
+
+export type HrHistoryItem = {
+  id: number;
+  timestamp: string;
+  username: string;
+  client_id: string;
+  shield_status: string;
+  risk_score: number;
+  detection_reason: string;
+  detection_layer: string;
+  matched_rule: string;
+  target_role: string;
+  candidate_email: string;
+  subject: string;
+  filename: string;
+  stage: string;
+  prompt_preview: string;
+};
+
+export type HrHistoryResponse = {
+  client_id: string;
+  count: number;
+  items: HrHistoryItem[];
+};
+
+export async function getHrHistory(input: {
+  clientId: string;
+  username?: string;
+  role?: string;
+  limit?: number;
+}): Promise<HrHistoryResponse> {
+  const params = new URLSearchParams({
+    client_id: input.clientId.trim() || "default",
+    username: input.username || "",
+    role: input.role || "EMPLOYEE",
+    limit: String(input.limit ?? 40),
+  });
+
+  return apiFetch<HrHistoryResponse>(
+    `/api/hr/history?${params.toString()}`,
   );
 }

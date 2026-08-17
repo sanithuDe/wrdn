@@ -1,0 +1,11 @@
+This is a SAFE demo marker file, not real malware.
+
+It only contains PDF dictionary names so YARA can
+show an inbound BLOCK before Gemini runs.
+
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /OpenAction << /S /JavaScript /JS (app.alert('demo');) >> >>
+endobj
+<< /Launch /EmbeddedFile >>
+%%EOF

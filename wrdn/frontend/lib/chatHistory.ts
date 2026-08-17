@@ -6,11 +6,19 @@ export interface StoredChatMessage {
   riskScore?: number;
   detectionLayer?: string;
   detectionReason?: string;
+  detectionLog?: Array<{
+    step: number;
+    name: string;
+    status: string;
+    risk_score: number;
+    detail: string;
+  }>;
 }
 
 export interface ChatSession {
   id: string;
   title: string;
+  createdAt?: string;
   updatedAt: string;
   messages: StoredChatMessage[];
   ownerUsername?: string;
@@ -89,6 +97,52 @@ function writeKey(
   );
 }
 
+function sessionCreatedAt(session: ChatSession) {
+  return Date.parse(
+    session.createdAt || session.updatedAt || "",
+  );
+}
+
+function sortNewestFirst(sessions: ChatSession[]) {
+  return [...sessions].sort(
+    (a, b) => sessionCreatedAt(b) - sessionCreatedAt(a),
+  );
+}
+
+function upsertIntoList(
+  sessions: ChatSession[],
+  next: ChatSession,
+  max: number,
+) {
+  const existingIndex = sessions.findIndex(
+    (item) => item.id === next.id,
+  );
+
+  if (existingIndex >= 0) {
+    const previous = sessions[existingIndex];
+    const updated = {
+      ...next,
+      createdAt:
+        previous.createdAt ||
+        previous.updatedAt ||
+        next.createdAt ||
+        next.updatedAt,
+    };
+    const locked = [...sessions];
+    locked[existingIndex] = updated;
+    return locked.slice(0, max);
+  }
+
+  return [
+    {
+      ...next,
+      createdAt:
+        next.createdAt || next.updatedAt,
+    },
+    ...sessions,
+  ].slice(0, max);
+}
+
 function withOwner(
   session: ChatSession,
   ctx: ChatUserContext,
@@ -127,7 +181,7 @@ export function loadVisibleChatSessions(
     ctx.role.trim().toUpperCase() === "ADMIN";
 
   if (!isAdmin) {
-    return personal;
+    return sortNewestFirst(personal);
   }
 
   const team = readKey(teamKey(ctx.clientId)).filter(
@@ -140,14 +194,12 @@ export function loadVisibleChatSessions(
         ctx.clientId,
   );
 
-  const merged = [...personal, ...team].sort(
-    (a, b) =>
-      Date.parse(b.updatedAt || "") -
-      Date.parse(a.updatedAt || ""),
+  // Newest chats stay at the top. Opening a chat does not
+  // reshuffle this list because createdAt is frozen.
+  return sortNewestFirst([...personal, ...team]).slice(
+    0,
+    MAX_CHAT_SESSIONS + 10,
   );
-
-  // Keep a bit more for admins so team history is visible.
-  return merged.slice(0, MAX_CHAT_SESSIONS + 10);
 }
 
 export function getChatSessionTitle(
@@ -196,11 +248,9 @@ export function upsertChatSession(
 
   const owned = withOwner(session, ctx);
 
-  const personal = loadPersonalChatSessions(ctx).filter(
-    (item) => item.id !== owned.id,
-  );
-  const nextPersonal = [owned, ...personal].slice(
-    0,
+  const nextPersonal = upsertIntoList(
+    loadPersonalChatSessions(ctx),
+    owned,
     MAX_CHAT_SESSIONS,
   );
   writeKey(
@@ -211,12 +261,14 @@ export function upsertChatSession(
 
   // Mirror into client team store so admins can review
   // employee (and peer) activity on this client.
-  const team = readKey(teamKey(ctx.clientId)).filter(
-    (item) => item.id !== owned.id,
+  const nextTeam = upsertIntoList(
+    readKey(teamKey(ctx.clientId)),
+    owned,
+    MAX_TEAM_CHAT_SESSIONS,
   );
   writeKey(
     teamKey(ctx.clientId),
-    [owned, ...team],
+    nextTeam,
     MAX_TEAM_CHAT_SESSIONS,
   );
 
