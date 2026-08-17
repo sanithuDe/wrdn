@@ -4,6 +4,7 @@ import Link from "next/link";
 export type AppSection =
   | "chat"
   | "policies"
+  | "users"
   | "hr"
   | "dashboard"
   | "live-registry"
@@ -80,7 +81,7 @@ export default function AppSidebar({
             <Link
               href="/users"
               className={`nav-link ${
-                activeSection === "settings" ? "active" : ""
+                activeSection === "users" ? "active" : ""
               }`}
             >
               Users

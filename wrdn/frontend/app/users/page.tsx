@@ -147,7 +147,7 @@ export default function UsersPage() {
   return (
     <div className="wrdn-application">
       <AppSidebar
-        activeSection="settings"
+        activeSection="users"
         onSectionChange={() => undefined}
         onNewChat={() => router.push("/")}
         isAdmin
@@ -386,7 +386,7 @@ export default function UsersPage() {
         }
 
         .users-refresh,
-        .users-form button,
+        .users-form > button,
         .users-delete {
           border: 0;
           border-radius: 10px;
@@ -443,30 +443,44 @@ export default function UsersPage() {
         .users-password-wrap {
           position: relative;
           display: block;
+          width: 100%;
         }
 
         .users-password-wrap input {
-          padding-right: 40px;
+          padding-right: 44px;
         }
 
-        .users-eye {
+        .users-form .users-eye {
           position: absolute;
-          right: 6px;
+          right: 8px;
           top: 50%;
           transform: translateY(-50%);
           width: 28px;
           height: 28px;
-          display: grid;
-          place-items: center;
+          box-sizing: border-box;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
           padding: 0;
+          margin: 0;
           border: 0;
           border-radius: 8px;
+          line-height: 0;
           color: #9fe9c4;
           background: transparent;
           cursor: pointer;
         }
 
-        .users-form button {
+        .users-form .users-eye:hover {
+          background: rgba(32, 228, 135, 0.12);
+        }
+
+        .users-form .users-eye svg {
+          display: block;
+          flex-shrink: 0;
+        }
+
+        .users-form > button {
           padding: 12px 16px;
           color: #05070c;
           background: linear-gradient(
@@ -477,7 +491,7 @@ export default function UsersPage() {
           );
         }
 
-        .users-form button:disabled,
+        .users-form > button:disabled,
         .users-refresh:disabled,
         .users-delete:disabled {
           opacity: 0.55;

@@ -92,8 +92,11 @@ CRITICAL extraction rules:
 11. If the document is an Admin allow/block checklist:
     - Copy blocked sector ids into blocked_categories exactly.
     - Do not add allowed sector ids into blocked_categories.
-    - Copy selected sensitive pattern ids into
-      sensitive_pattern_ids exactly.
+                    - Copy selected sensitive pattern ids into
+                      sensitive_pattern_ids exactly.
+                    - If no patterns are selected, use [].
+                    - Do not invent extra blocked categories
+                      or sensitive patterns.
     - Parse EXTRA INFORMATION for salary/secret allow-block lists.
     - Keep allowed_actions as ALLOW, REDACT, BLOCK.
 

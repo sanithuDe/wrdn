@@ -156,7 +156,7 @@ function buildChecklistRequirementText(
 
   const patternLines = patterns.length
     ? patterns.map((id) => `- ${id}`).join("\n")
-    : "- (none — choose sensible defaults for blocked sectors)";
+    : "- (none)";
 
   const extra = extraInfo.trim() || "(none provided)";
 
@@ -170,6 +170,8 @@ IMPORTANT FOR POLICY JSON (must match Policy History card):
 2. Do NOT put allowed sector ids into blocked_categories.
 3. Put selected sensitive pattern ids into sensitive_pattern_ids
    (same ids shown as orange tags on Policy History).
+   If the list is (none), leave sensitive_pattern_ids as [].
+   Do not invent extra patterns.
 4. Fill allowed_secret_names / blocked_secret_names /
    allowed_employee_salary_names / blocked_employee_salary_names
    only when EXTRA INFORMATION names them.
@@ -851,7 +853,7 @@ export default function PoliciesPage() {
                       <StepHeader
                         number="01"
                         title="Select security requirements"
-                        description="Tick Allowed or Blocked for each common sector. No file upload — this reduces malware and payload risk. Add any extra rules in the notes field."
+                        description="Tick Allowed for topics chat may answer. Tick Blocked to refuse those topics. Unchecked sensitive patterns stay unused — they will not be added automatically."
                       />
 
                       <form

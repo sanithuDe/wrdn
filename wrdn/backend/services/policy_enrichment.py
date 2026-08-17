@@ -511,6 +511,95 @@ def extract_selective_rules(
     }
 
 
+def _section_between(
+    text: str,
+    start_marker: str,
+    end_marker: str,
+) -> str:
+    lower = text.lower()
+    start = lower.find(start_marker.lower())
+    if start < 0:
+        return ""
+    start = start + len(start_marker)
+    end = lower.find(end_marker.lower(), start)
+    if end < 0:
+        return text[start:]
+    return text[start:end]
+
+
+def _ids_from_checklist_section(section: str) -> list[str]:
+    ids: list[str] = []
+    seen: set[str] = set()
+
+    for raw_line in section.splitlines():
+        line = raw_line.strip().lower()
+        if not line.startswith("-"):
+            continue
+        if "(none" in line:
+            continue
+        match = re.match(
+            r"^-\s+([a-z0-9_]+)\b",
+            line,
+        )
+        if not match:
+            continue
+        item = match.group(1)
+        if item in seen:
+            continue
+        seen.add(item)
+        ids.append(item)
+
+    return ids
+
+
+def apply_admin_checklist_override(
+    policy: dict[str, Any],
+    requirement_text: str,
+) -> dict[str, Any]:
+    """
+    If the requirement came from the Admin tick list,
+    copy those ticks exactly so Gemini cannot add extras.
+    """
+
+    if "admin allow/block checklist" not in (
+        requirement_text or ""
+    ).lower():
+        return policy
+
+    blocked = _ids_from_checklist_section(
+        _section_between(
+            requirement_text,
+            "BLOCKED CATEGORIES",
+            "ALLOWED CATEGORIES",
+        )
+    )
+    allowed = _ids_from_checklist_section(
+        _section_between(
+            requirement_text,
+            "ALLOWED CATEGORIES",
+            "SENSITIVE PATTERNS",
+        )
+    )
+    patterns = _ids_from_checklist_section(
+        _section_between(
+            requirement_text,
+            "SENSITIVE PATTERNS",
+            "EXTRA INFORMATION FROM ADMIN",
+        )
+    )
+
+    allowed_set = {item.lower() for item in allowed}
+    blocked = [
+        item
+        for item in blocked
+        if item.lower() not in allowed_set
+    ]
+
+    policy["blocked_categories"] = blocked
+    policy["sensitive_pattern_ids"] = patterns
+    return policy
+
+
 def enrich_policy_from_requirement(
     policy: dict[str, Any],
     requirement_text: str,
@@ -663,4 +752,7 @@ def enrich_policy_from_requirement(
     )
     enriched["admin_warnings"] = warnings
 
-    return enriched
+    return apply_admin_checklist_override(
+        enriched,
+        requirement_text,
+    )

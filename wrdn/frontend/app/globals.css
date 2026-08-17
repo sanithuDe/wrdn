@@ -59,6 +59,10 @@ button {
     #05070c;
 }
 
+.application-content.chat-view {
+  overflow: hidden;
+}
+
 .application-content {
   min-width: 0;
   height: 100vh;
@@ -365,7 +369,7 @@ button {
   min-height: 0;
   height: 100%;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 240px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 240px);
   align-items: stretch;
 }
 
@@ -433,12 +437,13 @@ button {
 }
 
 .chat-history-panel {
+  min-width: 0;
   min-height: 0;
   height: 100%;
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
-  padding: 16px 14px;
+  padding: 16px 12px 16px 14px;
   border-left: 1px solid rgba(255, 255, 255, 0.07);
   background: #0a0d14;
   overflow: hidden;
@@ -446,6 +451,8 @@ button {
 
 .chat-history-dock {
   margin-top: 0;
+  min-height: 0;
+  flex: 1 1 auto;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -453,6 +460,7 @@ button {
 }
 
 .chat-history-header {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -485,13 +493,35 @@ button {
 }
 
 .chat-history-list {
+  min-height: 0;
+  flex: 1 1 auto;
   display: grid;
   gap: 6px;
-  overflow: hidden;
+  align-content: start;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding-right: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(32, 228, 135, 0.35) transparent;
+}
+
+.chat-history-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.chat-history-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.chat-history-list::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(32, 228, 135, 0.35);
 }
 
 .chat-history-item {
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
   min-height: 40px;
   padding: 10px 12px;
   border: 1px solid rgba(148, 163, 184, 0.12);
@@ -501,11 +531,16 @@ button {
   text-align: left;
   font-size: 13px;
   line-height: 1.35;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
   cursor: pointer;
   transition: 0.2s ease;
+}
+
+.chat-history-item-title {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .chat-history-item:hover {
