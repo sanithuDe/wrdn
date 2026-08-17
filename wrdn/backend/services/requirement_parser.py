@@ -7,6 +7,10 @@ from pypdf import PdfReader
 
 from wrdn.config import MAX_REQUIREMENT_FILE_SIZE_BYTES
 
+from wrdn.backend.services.text_normalize import (
+    join_letter_spaced_pdf_text,
+)
+
 
 MAX_EXTRACTED_CHARACTERS = 50_000
 ALLOWED_EXTENSIONS = {
@@ -72,7 +76,9 @@ def extract_requirement_text(
     else:
         extracted_text = content.decode("utf-8")
 
-    extracted_text = extracted_text.strip()
+    extracted_text = join_letter_spaced_pdf_text(
+        extracted_text
+    ).strip()
 
     if not extracted_text:
         raise ValueError(

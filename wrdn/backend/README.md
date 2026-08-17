@@ -139,6 +139,9 @@ Docs: http://localhost:18000/docs
 - List / rollback / delete
 
 ### HR Candidates
+
+Test cases and screenshots: [WRDN Test Case Document](../WRDN_Test_Case_Document.docx)
+
 | Method | Path | Purpose |
 | --- | --- | --- |
 | `GET` | `/api/hr/sample-cvs` | Safe + attack sample text |

@@ -111,7 +111,6 @@ def text_to_pdf(text: str, output_path: Path) -> None:
 def main() -> None:
     mapping = {
         "01_safe_david_miller_ALLOWED.txt": "01_safe_david_miller_ALLOWED.pdf",
-        "02_attack_mallory_salary_leak.txt": "02_attack_mallory_salary_leak.pdf",
     }
     for src_name, pdf_name in mapping.items():
         src = ROOT / src_name

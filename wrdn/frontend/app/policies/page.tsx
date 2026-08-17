@@ -952,7 +952,7 @@ export default function PoliciesPage() {
 
                         <Field
                           label="Extra information"
-                          hint="Optional notes for Gemini (exceptions, salary allow/block names, company wording). These fill Allowed/Blocked secrets and salaries on the history card."
+                          hint="Optional notes (company name, extra rules). These are stored with the requirement."
                         >
                           <textarea
                             rows={5}
@@ -1168,7 +1168,7 @@ export default function PoliciesPage() {
                       <StepHeader
                         number="04"
                         title="Policy history"
-                        description="After checklist → generate → activate, each version shows the same fields: blocked categories, sensitive patterns, secrets, salaries, and allowed actions."
+                        description="Each version shows what chat may discuss (allowed) and what WRDN blocks, plus activation status."
                       />
 
                       <div className="history-header">
@@ -1195,18 +1195,20 @@ export default function PoliciesPage() {
                             const details = policy.Policy;
                             const blocked =
                               details?.blocked_categories || [];
-                            const patterns =
-                              details?.sensitive_pattern_ids || [];
-                            const allowedSecrets =
-                              details?.allowed_secret_names || [];
-                            const blockedSecrets =
-                              details?.blocked_secret_names || [];
-                            const allowedSalaries =
-                              details?.allowed_employee_salary_names || [];
-                            const blockedSalaries =
-                              details?.blocked_employee_salary_names || [];
-                            const allowed =
-                              details?.allowed_actions || [];
+                            const blockedSet = new Set(
+                              blocked.map((item) =>
+                                String(item).trim().toLowerCase(),
+                              ),
+                            );
+                            const allowedSectors =
+                              POLICY_SECTORS.filter(
+                                (sector) =>
+                                  !blockedSet.has(sector.id),
+                              );
+                            const blockedSectors =
+                              POLICY_SECTORS.filter((sector) =>
+                                blockedSet.has(sector.id),
+                              );
 
                             return (
                               <article
@@ -1286,127 +1288,37 @@ export default function PoliciesPage() {
 
                                 <div className="history-details">
                                   <div className="history-detail-block">
+                                    <span>Allowed categories</span>
+                                    <div className="tag-row">
+                                      {allowedSectors.length > 0 ? (
+                                        allowedSectors.map((sector) => (
+                                          <em
+                                            key={`${policy.PolicyID}-a-${sector.id}`}
+                                            className="tag tag-allowed"
+                                          >
+                                            {sector.label}
+                                          </em>
+                                        ))
+                                      ) : (
+                                        <small>None</small>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  <div className="history-detail-block">
                                     <span>Blocked categories</span>
                                     <div className="tag-row">
-                                      {blocked.length > 0 ? (
-                                        blocked.map((item) => (
+                                      {blockedSectors.length > 0 ? (
+                                        blockedSectors.map((sector) => (
                                           <em
-                                            key={`${policy.PolicyID}-b-${item}`}
+                                            key={`${policy.PolicyID}-b-${sector.id}`}
                                             className="tag tag-blocked"
                                           >
-                                            {item}
+                                            {sector.label}
                                           </em>
                                         ))
                                       ) : (
-                                        <small>None listed</small>
-                                      )}
-                                    </div>
-                                  </div>
-
-                                  <div className="history-detail-block">
-                                    <span>Sensitive patterns</span>
-                                    <div className="tag-row">
-                                      {patterns.length > 0 ? (
-                                        patterns.map((item) => (
-                                          <em
-                                            key={`${policy.PolicyID}-p-${item}`}
-                                            className="tag tag-pattern"
-                                          >
-                                            {item}
-                                          </em>
-                                        ))
-                                      ) : (
-                                        <small>None listed</small>
-                                      )}
-                                    </div>
-                                  </div>
-
-                                  <div className="history-detail-block">
-                                    <span>Allowed secrets</span>
-                                    <div className="tag-row">
-                                      {allowedSecrets.length > 0 ? (
-                                        allowedSecrets.map((item) => (
-                                          <em
-                                            key={`${policy.PolicyID}-as-${item}`}
-                                            className="tag tag-allowed"
-                                          >
-                                            {item}
-                                          </em>
-                                        ))
-                                      ) : (
-                                        <small>None listed</small>
-                                      )}
-                                    </div>
-                                  </div>
-
-                                  <div className="history-detail-block">
-                                    <span>Blocked secrets</span>
-                                    <div className="tag-row">
-                                      {blockedSecrets.length > 0 ? (
-                                        blockedSecrets.map((item) => (
-                                          <em
-                                            key={`${policy.PolicyID}-bs-${item}`}
-                                            className="tag tag-blocked"
-                                          >
-                                            {item}
-                                          </em>
-                                        ))
-                                      ) : (
-                                        <small>None listed</small>
-                                      )}
-                                    </div>
-                                  </div>
-
-                                  <div className="history-detail-block">
-                                    <span>Allowed salaries</span>
-                                    <div className="tag-row">
-                                      {allowedSalaries.length > 0 ? (
-                                        allowedSalaries.map((item) => (
-                                          <em
-                                            key={`${policy.PolicyID}-asal-${item}`}
-                                            className="tag tag-allowed"
-                                          >
-                                            {item}
-                                          </em>
-                                        ))
-                                      ) : (
-                                        <small>None listed</small>
-                                      )}
-                                    </div>
-                                  </div>
-
-                                  <div className="history-detail-block">
-                                    <span>Blocked salaries</span>
-                                    <div className="tag-row">
-                                      {blockedSalaries.length > 0 ? (
-                                        blockedSalaries.map((item) => (
-                                          <em
-                                            key={`${policy.PolicyID}-bsal-${item}`}
-                                            className="tag tag-blocked"
-                                          >
-                                            {item}
-                                          </em>
-                                        ))
-                                      ) : (
-                                        <small>None listed</small>
-                                      )}
-                                    </div>
-                                  </div>
-
-                                  <div className="history-detail-block">
-                                    <span>Allowed actions</span>
-                                    <div className="tag-row">
-                                      {allowed.length > 0 ? (
-                                        allowed.map((item) => (
-                                          <em
-                                            key={`${policy.PolicyID}-a-${item}`}
-                                            className="tag tag-allowed"
-                                          >
-                                            {item}
-                                          </em>
-                                        ))
-                                      ) : (
-                                        <small>None listed</small>
+                                        <small>None</small>
                                       )}
                                     </div>
                                   </div>

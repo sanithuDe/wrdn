@@ -88,31 +88,10 @@ def build_policy_summary(policy_json: str) -> str:
         CATEGORY_LABELS.get(item, item) for item in blocked
     ]
 
-    sensitive_patterns = policy.get("sensitive_pattern_ids") or []
-    allowed_secrets = policy.get("allowed_secret_names") or []
-    blocked_secrets = policy.get("blocked_secret_names") or []
-    allowed_salaries = (
-        policy.get("allowed_employee_salary_names") or []
-    )
-    blocked_salaries = (
-        policy.get("blocked_employee_salary_names") or []
-    )
-
     lines = [
         f"- Policy name: {policy.get('policy_name', 'N/A')}",
         f"- Allowed categories: {_format_list(allowed_labels)}",
         f"- Blocked categories: {_format_list(blocked_labels)}",
-        f"- Sensitive patterns: {_format_list(sensitive_patterns)}",
-        f"- Allowed secrets: {_format_list(allowed_secrets)}",
-        f"- Blocked secrets: {_format_list(blocked_secrets)}",
-        (
-            "- Allowed salaries: "
-            f"{_format_list(allowed_salaries)}"
-        ),
-        (
-            "- Blocked salaries: "
-            f"{_format_list(blocked_salaries)}"
-        ),
     ]
     return "\n".join(lines)
 

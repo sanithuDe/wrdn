@@ -18,6 +18,7 @@ Final-year demo: signup and role-based access, client policies with email activa
 8. [Project layout](#8-project-layout)
 9. [Troubleshooting](#9-troubleshooting)
 10. [Other README files](#10-other-readme-files)
+11. [Test case document](#11-test-case-document)
 
 ---
 
@@ -223,6 +224,9 @@ Users are **not** auto-created on startup.
 
 ## 7. How to test / demo
 
+Full step-by-step cases (chat E1–E5, HR Layers 1–4, protection ON/OFF):  
+**[WRDN Test Case Document](wrdn/WRDN_Test_Case_Document.docx)** (`wrdn/WRDN_Test_Case_Document.docx`)
+
 ### 7.1 Sign up and chat
 
 1. Open [http://localhost:18085](http://localhost:18085)
@@ -265,9 +269,10 @@ demo-wrdn-/
 └── wrdn/
     ├── backend/                 FastAPI API
     ├── frontend/                Next.js UI
-    ├── hr_demo_cvs/             Demo PDF CVs
-    ├── demo-requirements/       Sample policy texts
-    └── demo-wrdn--simulator/    Optional terminal demo
+    ├── WRDN_Test_Case_Document.docx   Test case report (Word)
+    ├── hr_demo_cvs/                   Demo PDF CVs
+    ├── demo-requirements/             Layer test CVs and samples
+    └── demo-wrdn--simulator/          Optional terminal demo
 ```
 
 ---
@@ -290,11 +295,27 @@ demo-wrdn-/
 
 | File | Contents |
 | --- | --- |
+| [wrdn/WRDN_Test_Case_Document.docx](wrdn/WRDN_Test_Case_Document.docx) | Test case report (chat, HR layers, protection ON/OFF) |
 | [wrdn/backend/README.md](wrdn/backend/README.md) | Backend APIs, HR pipeline, DB |
 | [wrdn/frontend/README.md](wrdn/frontend/README.md) | UI pages and demo flow |
 | [wrdn/demo-wrdn--simulator/README.md](wrdn/demo-wrdn--simulator/README.md) | Optional terminal simulator |
 
 Friends who only want to test the web app: **this root README is enough**.
+
+---
+
+## 11. Test case document
+
+Download and open:
+
+**[wrdn/WRDN_Test_Case_Document.docx](wrdn/WRDN_Test_Case_Document.docx)**
+
+That Word file is the assessment test report. It covers:
+
+- Chat prompts (ALLOWED / BLOCKED) against Standard Security Policy v5
+- HR Layer 1 Payload Analyzer, Layer 2 YARA, Layer 3 leak detector, Layer 4 policy review
+- Isolated SAM EDDH CVs under `wrdn/demo-requirements/Test Case 02/`
+- Protection **ON** (BLOCKED) vs protection **OFF** (BYPASSED) outbound email proof
 
 ---
 

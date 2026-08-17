@@ -239,6 +239,11 @@ def build_detection_log(
     policy_not_ok = not bool(
         (policy_check or {}).get("policy_ok", True)
     ) if policy_check is not None else False
+    policy_skipped = (
+        later_skipped
+        or policy_check is None
+        or leak_detected
+    )
 
     log.append(
         _layer_entry(
@@ -262,8 +267,8 @@ def build_detection_log(
         _layer_entry(
             4,
             "Policy risk review",
-            detected=policy_not_ok,
-            skipped=later_skipped or policy_check is None,
+            detected=policy_not_ok and not policy_skipped,
+            skipped=policy_skipped,
             risk_score=int(
                 (policy_check or {}).get("risk_score") or 0
             ),
@@ -271,9 +276,14 @@ def build_detection_log(
                 "Skipped because inbound scan blocked "
                 "before Gemini."
                 if later_skipped or policy_check is None
-                else str(
-                    (policy_check or {}).get("reason")
-                    or "Policy check passed."
+                else (
+                    "Skipped because regex leak detector "
+                    "already blocked the outbound email."
+                    if leak_detected
+                    else str(
+                        (policy_check or {}).get("reason")
+                        or "Policy check passed."
+                    )
                 )
             ),
         )
