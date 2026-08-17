@@ -9,16 +9,17 @@ Talks to the FastAPI backend at `http://localhost:18000` by default.
 ## What you can do in the UI
 
 | Section | Path | Who | Purpose |
-|---|---|---|---|
-| Login | `/login` | Everyone | Sign in |
-| AI Chat | `/` | Everyone | Ask Gemini through WRDN shield |
-| Policy Upload | `/policies` | ADMIN | Build / activate client policies |
-| Policy activation | `/policies/activation` | Email link | Confirm or reject activation |
-| HR Candidates | `/hr` | Everyone (admin toggle) | Upload CV → agents → shielded email |
+| --- | --- | --- | --- |
+| Sign up | `/signup` | Everyone | First user = Admin; later = Employee |
+| Sign in | `/signin` | Everyone | Sign in |
+| AI Chat | `/` | Everyone | Ask through the WRDN shield |
+| Policy Upload | `/policies` | ADMIN | Checklist → generate → activate |
+| Policy activation | `/policies/activation` | Email link | Confirm or reject |
+| Users | `/users` | ADMIN | Create / delete accounts |
+| HR Candidates | `/hr` | Everyone (admin toggle) | Upload CV → shielded email |
 | Security Dashboard | `/?section=dashboard` | Everyone | Overview |
 | Live Registry | `/?section=live-registry` | Everyone | Recent shield decisions |
-| Allowed / Blocked / Risk | sidebar sections | Everyone | Filtered logs |
-| Settings | `/?section=settings` | ADMIN | Enable / disable WRDN protection |
+| Settings | `/?section=settings` | ADMIN | Enable / disable WRDN |
 
 ---
 
@@ -27,58 +28,39 @@ Talks to the FastAPI backend at `http://localhost:18000` by default.
 ```text
 wrdn/frontend/
 ├── app/
-│   ├── page.tsx                 # Chat + registry shell
-│   ├── login/page.tsx
-│   ├── hr/page.tsx              # HR Candidate Processor
+│   ├── page.tsx
+│   ├── (auth)/signin/page.tsx
+│   ├── (auth)/signup/page.tsx
+│   ├── users/page.tsx
+│   ├── hr/page.tsx
 │   ├── policies/
-│   │   ├── page.tsx             # Policy wizard
-│   │   └── activation/page.tsx  # Email confirm/reject page
+│   │   ├── page.tsx
+│   │   └── activation/page.tsx
 │   ├── globals.css
 │   └── layout.tsx
 ├── components/
 │   ├── AppSidebar.tsx
 │   ├── ChatInterface.tsx
-│   ├── RegistryDashboard.tsx
-│   └── ...
+│   └── RegistryDashboard.tsx
 ├── lib/
-│   ├── api.ts                   # Policies, protection, HR APIs
+│   ├── api.ts
 │   ├── authApi.ts
 │   ├── chatApi.ts
-│   └── registryApi.ts
-├── Dockerfile
-├── package.json
-└── README.md
+│   └── chatHistory.ts
+└── package.json
 ```
 
 ---
 
-## Prerequisites
+## Run
 
-- Node.js 20+ (Docker image uses Node 20)
-- Backend running on port **18000**
-- Root `.env` / compose env with `NEXT_PUBLIC_API_URL=http://localhost:18000`
-
----
-
-## Run with Docker (recommended)
-
-From repo root:
-
-```powershell
-docker compose up -d --build frontend
-```
-
-Or start both services:
+Docker (from repo root):
 
 ```powershell
 docker compose up -d --build
 ```
 
-Open: http://localhost:18085
-
----
-
-## Run locally (without Docker)
+Local:
 
 ```powershell
 cd wrdn/frontend
@@ -88,132 +70,67 @@ npm run dev -- -p 18085
 
 Open: http://localhost:18085
 
-Production-style local build:
-
-```powershell
-npm run build
-npm run start -- -p 18085
-```
-
 ---
 
 ## Environment
-
-The browser calls the backend using:
 
 ```env
 NEXT_PUBLIC_API_URL=http://localhost:18000
 ```
 
-In Docker Compose this is set as a build arg + runtime env.
+---
 
-If you change the backend port, update this value and rebuild the frontend image.
+## Accounts
+
+Create the first admin on **Sign up**. Later public signups are employees. Admins add more users on `/users`.
 
 ---
 
-## Demo login
+## HR Candidates (`/hr`)
 
-| Username | Password | Role |
-|---|---|---|
-| `adminA` | `AdminA@2026!` | ADMIN |
-| `employeeA` | `EmpA@2026!` | EMPLOYEE |
-| `adminB` | `AdminB@2026!` | ADMIN |
-| `employeeB` | `EmpB@2026!` | EMPLOYEE |
-
-Use **adminA** for Policy Upload, protection toggle, and full HR demos.
-
----
-
-## HR Candidates page (`/hr`)
-
-### Flow
-1. Upload a **PDF / DOCX / TXT** CV (file only — no paste box)
-2. Optional: set target role
-3. Click **Process uploaded CV**
-4. File is sent to `POST /api/hr/process-cv-upload`
-5. Results show Agent 1 evaluation, Agent 2 email, WRDN status, Mailtrap send status
-
-### Sample buttons
-- **Load safe CV** / **Load attack CV** create a temporary `.txt` file and still go through the upload API.
-
-### Demo files on disk
-```text
-wrdn/hr_demo_cvs/
-├── 01_safe_david_miller_ALLOWED.pdf
-├── 02_attack_mallory_salary_leak.pdf
-└── 03_suspicious_pdf_javascript.pdf
-```
+1. Upload a PDF / DOCX / TXT CV
+2. Click **Process uploaded CV**
+3. Results show Agent 1, Agent 2, WRDN status, and Brevo send status
 
 | Scenario | Action | Expect |
-|---|---|---|
-| Safe | Upload `01_...` with WRDN ON | `ALLOWED` + email if Mailtrap configured |
+| --- | --- | --- |
+| Safe | Upload `01_...` with WRDN ON | `ALLOWED` + email if Brevo is configured |
 | Attack leak | Disable WRDN → upload `02_...` | `BYPASSED` + email |
 | Attack blocked | Enable WRDN → upload `02_...` | `BLOCKED` + no email |
-| Hostile PDF marker | Upload `03_...` | Inbound YARA **BLOCK**, no Gemini |
+| Hostile PDF | Upload `03_...` | Inbound YARA **BLOCK** |
 
 ---
 
-## Policy Upload page (`/policies`)
+## Policy Upload (`/policies`)
 
-Admin-only wizard:
-1. Upload requirement file
-2. Generate policy with Gemini
-3. Request activation → confirmation email (Mailtrap)
-4. Open email link → confirm on `/policies/activation`
-5. View history / rollback
+1. Tick ALLOWED / BLOCKED categories
+2. Generate policy
+3. Activate → confirmation email (Brevo)
+4. Confirm on `/policies/activation`
 
 ---
 
 ## Protection toggle
 
-Admins can disable WRDN in **Settings** or on the HR page.
-
-| Mode | Chat / HR meaning |
-|---|---|
-| ON | Normal shield → `ALLOWED` or `BLOCKED` |
-| OFF | Raw path → `BYPASSED` (demo comparison) |
-
----
-
-## API helpers
-
-Main client wrappers live in `lib/api.ts`:
-
-- Policies: upload, analyze, activate, list, rollback, delete
-- Protection: `getProtectionStatus`, `setProtectionStatus`
-- HR: `processHrCvUpload`, `extractHrCv`, `getHrSampleCvs`
-
-Auth: `lib/authApi.ts`  
-Chat: `lib/chatApi.ts`  
-Registry: `lib/registryApi.ts`
+| Mode | Meaning |
+| --- | --- |
+| ON | `ALLOWED` or `BLOCKED` |
+| OFF | `BYPASSED` (demo comparison) |
 
 ---
 
 ## Troubleshooting
 
 | Problem | Fix |
-|---|---|
-| UI loads but APIs fail | Backend must be on `18000`; check `NEXT_PUBLIC_API_URL` |
-| HR page missing after pull | Rebuild frontend: `docker compose up -d --build frontend` |
-| TypeScript build error in Docker | Rebuild after pulling latest; `AppSection` includes `hr` |
-| Login loop | Clear site data / check backend auth seed users |
-| Email confirm tab issues | Links open frontend activation page; return to Policy Upload tab |
-
----
-
-## Scripts
-
-| Command | Purpose |
-|---|---|
-| `npm run dev` | Dev server |
-| `npm run build` | Production build |
-| `npm run start` | Serve production build |
-| `npm run lint` | ESLint |
+| --- | --- |
+| UI loads but APIs fail | Backend must be on `18000` |
+| Login loop | Create an account on `/signup` first |
+| Email confirm tab issues | Links open `/policies/activation`; return to Policy Upload |
 
 ---
 
 ## Related docs
 
-- [Root README](../../README.md) — clone, `.env`, Docker for friends
+- [Root README](../../README.md)
 - [Backend README](../backend/README.md)
 - [Simulator README](../demo-wrdn--simulator/README.md)

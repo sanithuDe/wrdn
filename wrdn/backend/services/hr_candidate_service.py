@@ -778,9 +778,7 @@ def process_candidate_cv(
     email_subject = str(email_draft.get("subject") or "")
     email_to = str(email_draft.get("to") or "")
 
-    # ------------------------------------------------------------------
-    # leak detector → ALLOW / BLOCK / BYPASS
-    # ------------------------------------------------------------------
+    # Leak check → ALLOW / BLOCK / BYPASS
     leak = detect_outbound_email_leak(email_body)
 
     if not protection_enabled:
@@ -824,10 +822,7 @@ def process_candidate_cv(
         email_dispatched = True
         blocked_response = ""
 
-    # ------------------------------------------------------------------
-    # active Policies-page risk review
-    # on raw AI email. ALLOWED but policy says NOT OK,BLOCKED when protection is ON.
-    # ------------------------------------------------------------------
+    # Policy review of the drafted email
     policy_check = check_raw_email_against_policy(
         email_body,
         policy,
@@ -839,7 +834,6 @@ def process_candidate_cv(
         and shield_status == "ALLOWED"
         and policy_violation
     ):
-        # Old leak check passed; new policy review failed.
         shield_status = "BLOCKED"
         risk_score = max(
             int(risk_score),
@@ -861,7 +855,7 @@ def process_candidate_cv(
         final_email_body = blocked_response
         email_dispatched = False
     elif policy_violation:
-        # Keep old status (BLOCKED / BYPASSED), attach policy note.
+        # Keep BLOCKED / BYPASSED; add a policy note.
         risk_score = max(
             int(risk_score),
             int(policy_check["risk_score"]),

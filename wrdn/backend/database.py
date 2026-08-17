@@ -8,18 +8,14 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-# ==========================================
 # DATABASE LOCATION
-# ==========================================
 
 BASE_DIR = Path(__file__).resolve().parent
 DATA_DIR = BASE_DIR / "data"
 DATABASE_PATH = DATA_DIR / "wrdn.db"
 
 
-# ==========================================
 # SAMPLE DATA
-# ==========================================
 
 FALLBACK_EMPLOYEES = [
     {
@@ -275,9 +271,7 @@ FALLBACK_USER_ROLES = [
 ]
 
 
-# ==========================================
 # DATABASE CONNECTION
-# ==========================================
 
 def get_connection() -> sqlite3.Connection:
     """
@@ -299,9 +293,7 @@ def get_connection() -> sqlite3.Connection:
     return connection
 
 
-# ==========================================
 # DATABASE INITIALIZATION
-# ==========================================
 
 def initialize_database() -> None:
     """
@@ -554,9 +546,7 @@ ON Users(ClientID, Role);
         connection.close()
 
 
-# ==========================================
 # SEED FUNCTIONS
-# ==========================================
 
 def _ensure_column(
     cursor: sqlite3.Cursor,
@@ -775,9 +765,7 @@ def _seed_user_roles(
         )
 
 
-# ==========================================
-# AI DATABASE CONTEXT
-# ==========================================
+# DATABASE CONTEXT
 
 def get_database_context() -> str:
     """
@@ -1083,9 +1071,7 @@ def match_secret_name_for_prompt(
     return None
 
 
-# ==========================================
 # AUDIT LOG
-# ==========================================
 
 def save_audit_log(
     user_prompt: str,
@@ -1159,9 +1145,7 @@ def save_audit_log(
     finally:
         connection.close()
 
-# ==========================================
 # READ AUDIT LOGS
-# ==========================================
 
 def get_audit_logs(
     limit: int = 100,
@@ -1239,9 +1223,7 @@ def get_audit_logs(
         connection.close()
 
 
-# ==========================================
 # DATABASE STATUS
-# ==========================================
 
 def test_database_connection() -> dict[str, Any]:
     """
@@ -1288,9 +1270,7 @@ def test_database_connection() -> dict[str, Any]:
     finally:
         connection.close()
         
-# ==========================================
 # DATE AND TIME
-# ==========================================
 
 def get_current_utc_time() -> str:
     """
@@ -1301,9 +1281,7 @@ def get_current_utc_time() -> str:
         timezone.utc
     ).isoformat()
     
-    # ==========================================
 # CREATE REQUIREMENT REQUEST
-# ==========================================
 
 def create_requirement_request(
     request_code: str,
@@ -1382,9 +1360,7 @@ def create_requirement_request(
     finally:
         connection.close()
         
-        # ==========================================
 # FIND REQUEST BY TOKEN
-# ==========================================
 
 def get_requirement_request_by_token(
     token_hash: str,
@@ -1433,9 +1409,7 @@ def get_requirement_request_by_token(
     finally:
         connection.close()
         
-        # ==========================================
 # UPDATE REQUIREMENT STATUS
-# ==========================================
 
 def update_requirement_request_status(
     request_id: int,
@@ -1525,9 +1499,7 @@ def update_requirement_request_status(
     finally:
         connection.close()
         
-        # ==========================================
 # SAVE REQUIREMENT RULES
-# ==========================================
 
 def save_requirement_rules(
     request_id: int,
@@ -1614,9 +1586,7 @@ def save_requirement_rules(
     finally:
         connection.close()
         
-        # ==========================================
 # GET ACTIVE REQUIREMENT RULES
-# ==========================================
 
 def get_active_requirement_rules(
 ) -> list[dict[str, Any]]:
@@ -1673,9 +1643,7 @@ def get_active_requirement_rules(
     finally:
         connection.close()
         
-        # ==========================================
 # LIST REQUIREMENT REQUESTS
-# ==========================================
 
 def get_requirement_requests(
     limit: int = 100,
@@ -1724,9 +1692,7 @@ def get_requirement_requests(
     finally:
         connection.close()
         
-        # ==========================================
 # CREATE SECURITY ALERT
-# ==========================================
 
 def create_security_alert(
     request_id: int | None,
@@ -1786,9 +1752,7 @@ def create_security_alert(
     finally:
         connection.close()
         
-        # ==========================================
 # READ SECURITY ALERTS
-# ==========================================
 
 def get_security_alerts(
     limit: int = 100,
@@ -1832,9 +1796,7 @@ def get_security_alerts(
     finally:
         connection.close()
         
-        # ==========================================
 # USERS
-# ==========================================
 
 def create_user(
     username: str,
@@ -2422,6 +2384,6 @@ def set_protection_enabled(
         connection.close()
 
 
-# Create the database automatically when this module loads.
+# Create the database when this module loads.
 initialize_database()
 

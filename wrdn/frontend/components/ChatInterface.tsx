@@ -315,7 +315,7 @@ export default function ChatInterface({
         }
       })
       .catch(() => {
-        // Keep default enabled.
+        return;
       });
 
     return () => {

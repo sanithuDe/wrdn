@@ -12,9 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 
-# =========================================================
 # PROJECT PATH
-# =========================================================
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 
@@ -22,9 +20,7 @@ if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
 
-# =========================================================
 # PROJECT IMPORTS
-# =========================================================
 
 from wrdn.backend.database import (
     find_secret_answer_for_prompt,
@@ -76,18 +72,14 @@ except ImportError as error:
     ) from error
 
 
-# =========================================================
 # LOGGING
-# =========================================================
 
 logging.basicConfig(level=logging.INFO)
 
 logger = logging.getLogger("wrdn.backend")
 
 
-# =========================================================
 # FASTAPI APPLICATION
-# =========================================================
 
 app = FastAPI(
     title="WRDN Gemini Output Sanitizer Backend",
@@ -97,9 +89,7 @@ app.include_router(policies_router)
 app.include_router(auth_router)
 app.include_router(hr_router)
 
-# =========================================================
 # CORS
-# =========================================================
 
 app.add_middleware(
     CORSMiddleware,
@@ -113,9 +103,7 @@ app.add_middleware(
 )
 
 
-# =========================================================
 # APPLICATION STARTUP
-# =========================================================
 
 @app.on_event("startup")
 def startup_event() -> None:
@@ -138,17 +126,13 @@ def startup_event() -> None:
     )
 
 
-# =========================================================
 # SECURITY CONFIGURATION
-# =========================================================
 
 BLOCK_THRESHOLD = 70
 EMBEDDING_SIMILARITY_THRESHOLD = 0.72
 
 
-# Intent keywords mapped to policy blocked_categories.
-# If the user question matches a category that is active
-# in the client policy, block before Gemini runs.
+# Block listed policy categories before Gemini.
 INPUT_CATEGORY_KEYWORDS: dict[str, tuple[str, ...]] = {
     "personal_information": (
         "national id",
@@ -390,8 +374,7 @@ def input_intent_policy_check(
             return None
 
         if allowed_secrets or blocked_secrets:
-            # Selective secret policy: unlisted secrets
-            # are treated as blocked.
+            # Unlisted secrets are blocked.
             return {
                 "allowed": False,
                 "status": "BLOCKED",
@@ -556,8 +539,7 @@ def secret_is_allowed_by_policy(
         return True
 
     if allowed or blocked:
-        # Selective policy present: only listed
-        # allowed secrets may be revealed.
+        # Only listed allowed secrets may be revealed.
         return False
 
     return not credentials_blocked
@@ -792,8 +774,7 @@ def enforce_allow_block_semantics(
             "final_output": blocked_response,
         }
 
-    # 4) Never keep ALLOWED on a refusal when category
-    # keywords say the topic is blocked.
+    # 4) Do not keep ALLOWED when the topic is blocked.
     if (
         shield.get("status") == "ALLOWED"
         and looks_like_model_refusal(raw_ai_output)
@@ -1083,9 +1064,7 @@ def looks_like_model_refusal(
     )
 
 
-# =========================================================
 # GEMINI CLIENT
-# =========================================================
 
 if not GEMINI_API_KEY:
     raise RuntimeError(
@@ -1104,9 +1083,7 @@ except Exception as error:
     ) from error
 
 
-# =========================================================
 # REQUEST MODELS
-# =========================================================
 
 class PromptRequest(BaseModel):
     prompt: str
@@ -1114,9 +1091,7 @@ class PromptRequest(BaseModel):
     username: str = ""
 
 
-# =========================================================
 # GEMINI TEXT GENERATION
-# =========================================================
 
 FALLBACK_GEMINI_MODELS = [
     "gemini-flash-lite-latest",
@@ -1252,9 +1227,7 @@ def ask_gemini(
     )
 
 
-# =========================================================
 # GEMINI EMBEDDINGS
-# =========================================================
 
 def create_gemini_embedding(
     text: str,
@@ -1367,9 +1340,7 @@ def cosine_similarity(
     )
 
 
-# =========================================================
 # EMBEDDING SECURITY CHECK
-# =========================================================
 
 SENSITIVE_REFERENCE_TEXTS = [
     (
@@ -1538,9 +1509,7 @@ def embedding_risk_check(
         }
 
 
-# =========================================================
 # SENSITIVE DATA REDACTION
-# =========================================================
 
 def redact_sensitive_parts(
     raw_ai_output: str,
@@ -1597,9 +1566,7 @@ def redact_sensitive_parts(
     return redacted_output
 
 
-# =========================================================
 # REGEX OUTPUT SANITIZER
-# =========================================================
 
 POLICY_PATTERN_LIBRARY = {
     "api_key": [
@@ -1661,8 +1628,7 @@ def regex_output_sanitizer(
         if str(item).strip()
     }
 
-    # Default to blocking credentials/financial
-    # when no categories were provided (safe default).
+    # Block credentials/financial when no categories are set.
     block_credentials = (
         (not active)
         or ("credentials" in active)
@@ -1783,8 +1749,7 @@ def regex_output_sanitizer(
         )
 
         for policy_pattern in policy_patterns:
-            # Company employee emails are directory data.
-            # Do not hard-block on email alone.
+            # Employee emails are directory data, not a hard block.
             if pattern_id == "email_address":
                 patterns[policy_pattern] = 35
             else:
@@ -1825,9 +1790,7 @@ def regex_output_sanitizer(
     }
 
 
-# =========================================================
 # FINAL OUTPUT SANITIZER
-# =========================================================
 def final_output_sanitizer(
     raw_ai_output: str,
     block_threshold: int = BLOCK_THRESHOLD,
@@ -1918,9 +1881,7 @@ def final_output_sanitizer(
         "final_output": raw_ai_output,
     }
 
-# =========================================================
 # ROOT ROUTE
-# =========================================================
 
 @app.get("/")
 def home() -> dict[str, Any]:
@@ -1940,9 +1901,7 @@ def home() -> dict[str, Any]:
     }
 
 
-# =========================================================
 # HEALTH ROUTES
-# =========================================================
 
 @app.get("/health")
 def docker_health_check(
@@ -2057,9 +2016,7 @@ def update_protection_status(
     }
 
 
-# =========================================================
 # GEMINI TEST ROUTE
-# =========================================================
 
 @app.get("/api/test-gemini")
 def test_gemini(
@@ -2122,9 +2079,7 @@ def test_gemini(
     return result
 
 
-# =========================================================
 # LOCAL SQLITE REGISTRY ROUTE
-# =========================================================
 
 @app.get("/api/registry")
 def get_registry(
@@ -2236,8 +2191,7 @@ def get_registry(
                     log_record
                 )
             else:
-                # keep unknown rows visible under
-                # blocked logs for investigation.
+                # Keep unknown rows in blocked logs.
                 log_record["shield_status"] = (
                     shield_status
                     if shield_status
@@ -2310,9 +2264,7 @@ def get_registry(
         }
 
 
-# =========================================================
 # chat route
-# =========================================================
 
 @app.post("/chat")
 def chat(
@@ -2671,8 +2623,7 @@ def chat(
             model_prompt
         )
 
-        # demo reliability: fill allowed secrets/salaries
-        # from SQLite when Gemini refuses or omits values.
+        # Fill allowed secrets/salaries from SQLite if Gemini omits them.
         credentials_blocked = (
             "credentials"
             in {
@@ -2771,8 +2722,7 @@ def chat(
                 ):
                     raw_ai_output = salary_answer
 
-        # policy Judge LLM receives allow/block rules from
-        # the requirement-generated policy.
+        # Judge uses allow/block rules from the active policy.
         try:
             shield = judge_output_against_policy(
                 user_prompt=user_prompt,
@@ -2797,8 +2747,7 @@ def chat(
                 blocked_categories=blocked_categories,
             )
 
-        # hard regex backup only when credentials are broadly
-        # blocked and judge allowed something suspicious.
+        # Regex backup when credentials are broadly blocked.
         if (
             credentials_blocked
             and shield.get("status") == "ALLOWED"
@@ -2826,8 +2775,7 @@ def chat(
                     "final_output": blocked_response,
                 }
 
-        # project-wide rule: BLOCKED means forbidden request,
-        # allowed means permitted request with usable answer.
+        # BLOCKED = refused request; ALLOWED = usable answer.
         shield = enforce_allow_block_semantics(
             user_prompt=user_prompt,
             raw_ai_output=raw_ai_output,
@@ -2845,8 +2793,7 @@ def chat(
             blocked_categories=blocked_categories,
         )
 
-        # Keep raw_ai_output aligned with final answer text
-        # when semantics filled an allowed value.
+        # Keep raw_ai_output in sync when a DB value was filled in.
         if shield.get("status") == "ALLOWED":
             raw_ai_output = str(
                 shield.get(
@@ -3012,9 +2959,7 @@ def chat(
         }
 
 
-# =========================================================
 # SANITIZE ROUTE
-# =========================================================
 
 @app.post("/sanitize")
 def sanitize_only(

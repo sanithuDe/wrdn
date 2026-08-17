@@ -26,9 +26,7 @@ from wrdn.config import (
 )
 
 
-# =========================================================
 # UPLOAD FOLDERS
-# =========================================================
 
 BASE_DIR = Path(__file__).resolve().parent
 
@@ -53,9 +51,7 @@ EXPIRED_DIR = (
 )
 
 
-# =========================================================
 # ALLOWED VALUES
-# =========================================================
 
 ALLOWED_FILE_EXTENSIONS = {
     ".json",
@@ -74,9 +70,7 @@ ALLOWED_ROLES = {
 }
 
 
-# =========================================================
 # CREATE UPLOAD DIRECTORIES
-# =========================================================
 
 def initialize_requirement_directories() -> None:
     """
@@ -95,9 +89,7 @@ def initialize_requirement_directories() -> None:
         )
 
 
-# =========================================================
 # HASH HELPERS
-# =========================================================
 
 def hash_text(
     value: str,
@@ -123,9 +115,7 @@ def calculate_file_hash(
     ).hexdigest()
 
 
-# =========================================================
 # REQUEST CODE
-# =========================================================
 
 def generate_request_code() -> str:
     """
@@ -145,9 +135,7 @@ def generate_request_code() -> str:
     )
 
 
-# =========================================================
 # FILE VALIDATION
-# =========================================================
 
 def validate_requirement_file(
     original_filename: str,
@@ -379,9 +367,7 @@ def validate_requirement_file(
     }
 
 
-# =========================================================
 # CREATE REQUIREMENT REQUEST
-# =========================================================
 
 def create_pending_requirement(
     file_content: bytes,
@@ -539,9 +525,7 @@ def create_pending_requirement(
         raise
 
 
-# =========================================================
 # EXPIRY CHECK
-# =========================================================
 
 def is_request_expired(
     request: dict[str, Any],
@@ -575,9 +559,7 @@ def is_request_expired(
     )
 
 
-# =========================================================
 # MOVE FILE
-# =========================================================
 
 def move_requirement_file(
     current_path: str,
@@ -611,9 +593,7 @@ def move_requirement_file(
     return destination_path
 
 
-# =========================================================
 # APPROVE REQUIREMENT
-# =========================================================
 
 def approve_requirement(
     token: str,
@@ -798,9 +778,7 @@ def approve_requirement(
         raise
 
 
-# =========================================================
 # REJECT REQUIREMENT
-# =========================================================
 
 def reject_requirement(
     token: str,

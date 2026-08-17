@@ -153,7 +153,6 @@ export default function RegistryDashboard({
         }
       })
       .catch(() => {
-        // Keep default enabled if status cannot load.
       });
 
     return () => {

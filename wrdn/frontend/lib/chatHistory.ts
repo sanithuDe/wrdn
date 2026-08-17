@@ -155,7 +155,6 @@ function withOwner(
   };
 }
 
-/** Personal chats for one user only. */
 export function loadPersonalChatSessions(
   ctx: ChatUserContext,
 ): ChatSession[] {
@@ -165,11 +164,6 @@ export function loadPersonalChatSessions(
   );
 }
 
-/**
- * What the signed-in user may see in Recent Chats.
- * Employee: own chats only.
- * Admin: own chats + other users on the same client.
- */
 export function loadVisibleChatSessions(
   ctx: ChatUserContext,
 ): ChatSession[] {
@@ -194,8 +188,6 @@ export function loadVisibleChatSessions(
         ctx.clientId,
   );
 
-  // Newest chats stay at the top. Opening a chat does not
-  // reshuffle this list because createdAt is frozen.
   return sortNewestFirst([...personal, ...team]).slice(
     0,
     MAX_CHAT_SESSIONS + 10,
@@ -259,8 +251,6 @@ export function upsertChatSession(
     MAX_CHAT_SESSIONS,
   );
 
-  // Mirror into client team store so admins can review
-  // employee (and peer) activity on this client.
   const nextTeam = upsertIntoList(
     readKey(teamKey(ctx.clientId)),
     owned,
@@ -290,9 +280,4 @@ export function createChatSessionId() {
   return `chat-${Date.now()}-${Math.random()
     .toString(36)
     .slice(2, 8)}`;
-}
-
-/** @deprecated use loadVisibleChatSessions with user ctx */
-export function loadChatSessions(): ChatSession[] {
-  return [];
 }
