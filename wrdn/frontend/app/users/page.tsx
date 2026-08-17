@@ -35,6 +35,8 @@ export default function UsersPage() {
 
   const [newUsername, setNewUsername] = useState("");
   const [newPassword, setNewPassword] = useState("");
+  const [showNewPassword, setShowNewPassword] =
+    useState(false);
   const [newRole, setNewRole] = useState<
     "ADMIN" | "EMPLOYEE"
   >("EMPLOYEE");
@@ -192,15 +194,55 @@ export default function UsersPage() {
             </label>
             <label>
               Password
-              <input
-                type="password"
-                value={newPassword}
-                onChange={(e) =>
-                  setNewPassword(e.target.value)
-                }
-                placeholder="Min 8 chars + complexity"
-                required
-              />
+              <span className="users-password-wrap">
+                <input
+                  type={
+                    showNewPassword ? "text" : "password"
+                  }
+                  value={newPassword}
+                  onChange={(e) =>
+                    setNewPassword(e.target.value)
+                  }
+                  placeholder="Min 8 chars + complexity"
+                  required
+                />
+                <button
+                  type="button"
+                  className="users-eye"
+                  aria-label={
+                    showNewPassword
+                      ? "Hide password"
+                      : "Show password"
+                  }
+                  onClick={() =>
+                    setShowNewPassword((open) => !open)
+                  }
+                >
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    aria-hidden
+                  >
+                    {showNewPassword ? (
+                      <>
+                        <path d="M3 3l18 18" />
+                        <path d="M10.6 10.6a2 2 0 0 0 2.8 2.8" />
+                        <path d="M9.9 5.1A10.9 10.9 0 0 1 12 5c7 0 11 7 11 7a18.5 18.5 0 0 1-4.2 5.1" />
+                        <path d="M6.6 6.6C4.1 8.4 2.5 11 2.5 12S5 17 12 17c1.1 0 2.1-.1 3.1-.4" />
+                      </>
+                    ) : (
+                      <>
+                        <path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z" />
+                        <circle cx="12" cy="12" r="3" />
+                      </>
+                    )}
+                  </svg>
+                </button>
+              </span>
             </label>
             <label>
               Role
@@ -396,6 +438,32 @@ export default function UsersPage() {
           color: #f5f7fb;
           background: #05070c;
           font: inherit;
+        }
+
+        .users-password-wrap {
+          position: relative;
+          display: block;
+        }
+
+        .users-password-wrap input {
+          padding-right: 40px;
+        }
+
+        .users-eye {
+          position: absolute;
+          right: 6px;
+          top: 50%;
+          transform: translateY(-50%);
+          width: 28px;
+          height: 28px;
+          display: grid;
+          place-items: center;
+          padding: 0;
+          border: 0;
+          border-radius: 8px;
+          color: #9fe9c4;
+          background: transparent;
+          cursor: pointer;
         }
 
         .users-form button {

@@ -10,6 +10,7 @@ from wrdn.backend.services.auth_service import (
     list_managed_users,
     login_user,
     logout_user,
+    public_signup_is_empty,
     register_user,
 )
 from wrdn.backend.database import delete_all_users
@@ -32,7 +33,6 @@ class SignupRequest(BaseModel):
     organisation: str
     full_name: str
     email: str
-    role: str = "EMPLOYEE"
 
 
 class CreateUserRequest(BaseModel):
@@ -113,6 +113,16 @@ def clear_users() -> dict:
     }
 
 
+@router.get("/signup-status")
+def signup_status() -> dict:
+    empty = public_signup_is_empty()
+    return {
+        "status": "ok",
+        "first_admin_available": empty,
+        "public_role": "ADMIN" if empty else "EMPLOYEE",
+    }
+
+
 @router.post("/signup")
 def signup(request: SignupRequest) -> dict:
     try:
@@ -120,7 +130,6 @@ def signup(request: SignupRequest) -> dict:
             username=request.username,
             password=request.password,
             organisation=request.organisation,
-            role=request.role,
             full_name=request.full_name,
             email=request.email,
         )

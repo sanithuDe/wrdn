@@ -4,6 +4,7 @@ import secrets
 from typing import Any
 
 from wrdn.backend.database import (
+    count_all_users,
     count_users_by_role,
     create_user,
     delete_user_by_username,
@@ -330,6 +331,10 @@ def resolve_organisation_client(
     return client_id, raw
 
 
+def public_signup_is_empty() -> bool:
+    return count_all_users() == 0
+
+
 def register_user(
     username: str,
     password: str,
@@ -339,7 +344,12 @@ def register_user(
     email: str = "",
 ) -> dict[str, Any]:
     """
-    Public signup for ADMIN or EMPLOYEE with full details.
+    Public signup.
+
+    First user in an empty database may become ADMIN.
+    After that, public signup is always EMPLOYEE.
+    Requested role from the client is ignored except
+    for that first-user bootstrap.
     """
 
     cleaned_username = username.strip()
@@ -366,16 +376,21 @@ def register_user(
 
     validate_password_strength(password)
 
-    normalized_role = role.strip().upper()
-    if normalized_role not in {"ADMIN", "EMPLOYEE"}:
-        raise ValueError(
-            "Account type must be Admin or Employee."
-        )
-
     if get_user_by_username(cleaned_username):
         raise ValueError(
             "Username is already taken."
         )
+
+    # Security: never trust public role after bootstrap.
+    if count_all_users() == 0:
+        normalized_role = "ADMIN"
+    else:
+        requested = (role or "EMPLOYEE").strip().upper()
+        if requested == "ADMIN":
+            raise ValueError(
+                "Admin accounts can only be created by an existing admin."
+            )
+        normalized_role = "EMPLOYEE"
 
     client_id, client_name = resolve_organisation_client(
         organisation

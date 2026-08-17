@@ -14,6 +14,7 @@ export default function SignInPage() {
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -93,15 +94,53 @@ export default function SignInPage() {
 
             <div className="auth-field">
               <label htmlFor="signin-password">Password</label>
-              <input
-                id="signin-password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Your password"
-                autoComplete="current-password"
-                required
-              />
+              <div className="auth-password-wrap">
+                <input
+                  id="signin-password"
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Your password"
+                  autoComplete="current-password"
+                  required
+                />
+                <button
+                  type="button"
+                  className="auth-eye"
+                  aria-label={
+                    showPassword
+                      ? "Hide password"
+                      : "Show password"
+                  }
+                  onClick={() =>
+                    setShowPassword((open) => !open)
+                  }
+                >
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    aria-hidden
+                  >
+                    {showPassword ? (
+                      <>
+                        <path d="M3 3l18 18" />
+                        <path d="M10.6 10.6a2 2 0 0 0 2.8 2.8" />
+                        <path d="M9.9 5.1A10.9 10.9 0 0 1 12 5c7 0 11 7 11 7a18.5 18.5 0 0 1-4.2 5.1" />
+                        <path d="M6.6 6.6C4.1 8.4 2.5 11 2.5 12S5 17 12 17c1.1 0 2.1-.1 3.1-.4" />
+                      </>
+                    ) : (
+                      <>
+                        <path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z" />
+                        <circle cx="12" cy="12" r="3" />
+                      </>
+                    )}
+                  </svg>
+                </button>
+              </div>
             </div>
 
             {error ? (
@@ -377,6 +416,35 @@ export default function SignInPage() {
         .auth-field input:focus {
           border-color: #20e487;
           box-shadow: 0 0 0 3px rgba(32, 228, 135, 0.14);
+        }
+
+        .auth-password-wrap {
+          position: relative;
+        }
+
+        .auth-password-wrap input {
+          padding-right: 44px;
+        }
+
+        .auth-eye {
+          position: absolute;
+          right: 8px;
+          top: 50%;
+          transform: translateY(-50%);
+          width: 32px;
+          height: 32px;
+          display: grid;
+          place-items: center;
+          padding: 0;
+          border: 0;
+          border-radius: 8px;
+          color: #9fe9c4;
+          background: transparent;
+          cursor: pointer;
+        }
+
+        .auth-eye:hover {
+          background: rgba(32, 228, 135, 0.12);
         }
 
         .auth-submit {

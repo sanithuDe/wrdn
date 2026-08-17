@@ -117,13 +117,35 @@ export async function login(
   return data as LoginResponse;
 }
 
+export async function getSignupStatus(): Promise<{
+  first_admin_available: boolean;
+  public_role: "ADMIN" | "EMPLOYEE" | string;
+}> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/auth/signup-status`,
+  );
+  const data = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    throw new Error(
+      errorMessage(data, "Could not check signup status."),
+    );
+  }
+
+  return {
+    first_admin_available: Boolean(
+      data?.first_admin_available,
+    ),
+    public_role: data?.public_role || "EMPLOYEE",
+  };
+}
+
 export async function signup(input: {
   username: string;
   password: string;
   organisation: string;
   full_name: string;
   email: string;
-  role: "ADMIN" | "EMPLOYEE";
 }): Promise<{
   status: string;
   message: string;

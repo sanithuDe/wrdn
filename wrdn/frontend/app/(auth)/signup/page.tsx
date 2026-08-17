@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 
-import { signup } from "@/lib/authApi";
+import { getSignupStatus, signup } from "@/lib/authApi";
 
 function validatePassword(password: string): string | null {
   if (password.length < 8) {
@@ -31,12 +31,12 @@ export default function SignUpPage() {
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [organisation, setOrganisation] = useState("");
-  const [accountType, setAccountType] = useState<
-    "ADMIN" | "EMPLOYEE"
-  >("EMPLOYEE");
+  const [firstAdmin, setFirstAdmin] = useState(false);
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] =
     useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -66,6 +66,16 @@ export default function SignUpPage() {
     ],
     [password],
   );
+
+  useEffect(() => {
+    void getSignupStatus()
+      .then((status) => {
+        setFirstAdmin(status.first_admin_available);
+      })
+      .catch(() => {
+        setFirstAdmin(false);
+      });
+  }, []);
 
   async function handleSubmit(
     event: FormEvent<HTMLFormElement>,
@@ -108,7 +118,6 @@ export default function SignUpPage() {
         organisation: organisation.trim(),
         full_name: fullName.trim(),
         email: email.trim(),
-        role: accountType,
       });
       setMessage(
         result.message ||
@@ -165,7 +174,10 @@ export default function SignUpPage() {
             <p className="auth-step">Step 1</p>
             <h2>Create your account</h2>
             <p>
-              Enter your full details as Admin or Employee.
+              {firstAdmin
+                ? "No accounts exist yet. This first signup becomes the Admin. Later signups are Employee only."
+                : "Public signup creates an Employee account. Admin accounts are created only by an existing Admin."}
+              {" "}
               Then open Sign in and type the same username
               and password again.
             </p>
@@ -173,20 +185,12 @@ export default function SignUpPage() {
 
           <form className="auth-form" onSubmit={handleSubmit}>
             <div className="auth-field">
-              <label htmlFor="signup-role">Account type</label>
-              <select
-                id="signup-role"
-                value={accountType}
-                onChange={(e) =>
-                  setAccountType(
-                    e.target.value as "ADMIN" | "EMPLOYEE",
-                  )
-                }
-                required
-              >
-                <option value="EMPLOYEE">Employee</option>
-                <option value="ADMIN">Admin</option>
-              </select>
+              <label>Account type</label>
+              <p className="auth-role-note">
+                {firstAdmin
+                  ? "Admin (first account only)"
+                  : "Employee"}
+              </p>
             </div>
 
             <div className="auth-field">
@@ -243,33 +247,109 @@ export default function SignUpPage() {
             <div className="auth-field-row">
               <div className="auth-field">
                 <label htmlFor="signup-password">Password</label>
-                <input
-                  id="signup-password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  autoComplete="new-password"
-                  minLength={8}
-                  required
-                />
+                <div className="auth-password-wrap">
+                  <input
+                    id="signup-password"
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    autoComplete="new-password"
+                    minLength={8}
+                    required
+                  />
+                  <button
+                    type="button"
+                    className="auth-eye"
+                    aria-label={
+                      showPassword
+                        ? "Hide password"
+                        : "Show password"
+                    }
+                    onClick={() =>
+                      setShowPassword((open) => !open)
+                    }
+                  >
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      aria-hidden
+                    >
+                      {showPassword ? (
+                        <>
+                          <path d="M3 3l18 18" />
+                          <path d="M10.6 10.6a2 2 0 0 0 2.8 2.8" />
+                          <path d="M9.9 5.1A10.9 10.9 0 0 1 12 5c7 0 11 7 11 7a18.5 18.5 0 0 1-4.2 5.1" />
+                          <path d="M6.6 6.6C4.1 8.4 2.5 11 2.5 12S5 17 12 17c1.1 0 2.1-.1 3.1-.4" />
+                        </>
+                      ) : (
+                        <>
+                          <path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z" />
+                          <circle cx="12" cy="12" r="3" />
+                        </>
+                      )}
+                    </svg>
+                  </button>
+                </div>
               </div>
               <div className="auth-field">
                 <label htmlFor="signup-confirm">
                   Confirm password
                 </label>
-                <input
-                  id="signup-confirm"
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(e) =>
-                    setConfirmPassword(e.target.value)
-                  }
-                  placeholder="••••••••"
-                  autoComplete="new-password"
-                  minLength={8}
-                  required
-                />
+                <div className="auth-password-wrap">
+                  <input
+                    id="signup-confirm"
+                    type={showConfirm ? "text" : "password"}
+                    value={confirmPassword}
+                    onChange={(e) =>
+                      setConfirmPassword(e.target.value)
+                    }
+                    placeholder="••••••••"
+                    autoComplete="new-password"
+                    minLength={8}
+                    required
+                  />
+                  <button
+                    type="button"
+                    className="auth-eye"
+                    aria-label={
+                      showConfirm
+                        ? "Hide confirm password"
+                        : "Show confirm password"
+                    }
+                    onClick={() =>
+                      setShowConfirm((open) => !open)
+                    }
+                  >
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      aria-hidden
+                    >
+                      {showConfirm ? (
+                        <>
+                          <path d="M3 3l18 18" />
+                          <path d="M10.6 10.6a2 2 0 0 0 2.8 2.8" />
+                          <path d="M9.9 5.1A10.9 10.9 0 0 1 12 5c7 0 11 7 11 7a18.5 18.5 0 0 1-4.2 5.1" />
+                          <path d="M6.6 6.6C4.1 8.4 2.5 11 2.5 12S5 17 12 17c1.1 0 2.1-.1 3.1-.4" />
+                        </>
+                      ) : (
+                        <>
+                          <path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z" />
+                          <circle cx="12" cy="12" r="3" />
+                        </>
+                      )}
+                    </svg>
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -539,6 +619,17 @@ export default function SignUpPage() {
           font-weight: 700;
         }
 
+        .auth-role-note {
+          margin: 0;
+          padding: clamp(10px, 1.5vh, 15px) 14px;
+          border: 1px solid rgba(32, 228, 135, 0.28);
+          border-radius: 12px;
+          color: #9fe9c4;
+          background: rgba(32, 228, 135, 0.08);
+          font-size: clamp(13px, 1.2vw, 15px);
+          font-weight: 700;
+        }
+
         .auth-field input,
         .auth-field select {
           width: 100%;
@@ -559,10 +650,33 @@ export default function SignUpPage() {
           cursor: pointer;
         }
 
-        .auth-field input:focus,
-        .auth-field select:focus {
-          border-color: #20e487;
-          box-shadow: 0 0 0 3px rgba(32, 228, 135, 0.14);
+        .auth-password-wrap {
+          position: relative;
+        }
+
+        .auth-password-wrap input {
+          padding-right: 44px;
+        }
+
+        .auth-eye {
+          position: absolute;
+          right: 8px;
+          top: 50%;
+          transform: translateY(-50%);
+          width: 32px;
+          height: 32px;
+          display: grid;
+          place-items: center;
+          padding: 0;
+          border: 0;
+          border-radius: 8px;
+          color: #9fe9c4;
+          background: transparent;
+          cursor: pointer;
+        }
+
+        .auth-eye:hover {
+          background: rgba(32, 228, 135, 0.12);
         }
 
         .auth-password-rules {

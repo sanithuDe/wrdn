@@ -2070,6 +2070,20 @@ def delete_user_by_username(username: str) -> bool:
         connection.close()
 
 
+def count_all_users() -> int:
+    connection = get_connection()
+
+    try:
+        cursor = connection.cursor()
+        row = cursor.execute(
+            "SELECT COUNT(*) AS Total FROM Users"
+        ).fetchone()
+        return int(row["Total"] if row else 0)
+
+    finally:
+        connection.close()
+
+
 def delete_all_users() -> int:
     """
     Remove every user row. Returns deleted count.
