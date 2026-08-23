@@ -1268,6 +1268,140 @@ td {
   height: 180px;
 }
 
+.registry-insight {
+  margin: 12px 0 0;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 12px;
+  color: #c7ccd5;
+  background: rgba(255, 255, 255, 0.03);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.registry-insight strong {
+  color: #ffffff;
+}
+
+.risk-split {
+  margin: 12px 0 14px;
+}
+
+.risk-split-bar {
+  display: flex;
+  overflow: hidden;
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.risk-split-bar .allowed {
+  background: #20e487;
+}
+
+.risk-split-bar .blocked {
+  background: #ff506d;
+}
+
+.risk-split-legend {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 8px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.risk-simple-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.risk-simple-box {
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.16);
+}
+
+.risk-simple-box h4 {
+  margin: 0;
+  color: #ffffff;
+  font-size: 13px;
+}
+
+.risk-simple-box > p {
+  margin: 4px 0 10px;
+  color: #7d8590;
+  font-size: 11px;
+}
+
+.empty-hint {
+  margin: 0;
+  color: #7d8590;
+  font-size: 12px;
+}
+
+.risk-reason-list,
+.risk-latest-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 10px;
+}
+
+.risk-reason-list li {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  color: #d5dae3;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.risk-reason-list strong {
+  flex-shrink: 0;
+  color: #ffffff;
+}
+
+.risk-latest-list li {
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.risk-latest-list li:last-child {
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.risk-latest-list li > div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.risk-latest-list em {
+  color: #ff8f8f;
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.risk-latest-list p {
+  margin: 6px 0 4px;
+  color: #e8edf5;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.risk-latest-list small {
+  color: #7d8590;
+  font-size: 11px;
+}
+
 /* Responsive */
 
 @media (max-width: 1100px) {
@@ -1280,6 +1414,10 @@ td {
   }
 
   .charts-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .risk-simple-grid {
     grid-template-columns: 1fr;
   }
 }
