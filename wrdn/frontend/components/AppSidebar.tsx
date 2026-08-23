@@ -1,7 +1,11 @@
 "use client";
+import Link from "next/link";
 
 export type AppSection =
   | "chat"
+  | "policies"
+  | "users"
+  | "hr"
   | "dashboard"
   | "live-registry"
   | "allowed"
@@ -11,20 +15,24 @@ export type AppSection =
 
 interface AppSidebarProps {
   activeSection: AppSection;
-  onSectionChange: (
-    section: AppSection,
-  ) => void;
+  onSectionChange: (section: AppSection) => void;
   onNewChat: () => void;
+  isAdmin?: boolean;
+  username?: string;
+  onLogout?: () => void;
 }
 
 export default function AppSidebar({
   activeSection,
   onSectionChange,
   onNewChat,
+  isAdmin = false,
+  username,
+  onLogout,
 }: AppSidebarProps) {
   return (
     <aside className="app-sidebar">
-      <div>
+      <div className="app-sidebar-top">
         <div className="app-brand">
           <div className="app-brand-logo">
             W
@@ -48,96 +56,108 @@ export default function AppSidebar({
         </button>
 
         <nav className="app-navigation">
-          <button
-            className={
-              activeSection === "chat"
-                ? "active"
-                : ""
-            }
-            onClick={() =>
-              onSectionChange("chat")
-            }
+          <Link
+            href="/?section=chat"
+            className={`nav-link ${
+              activeSection === "chat" ? "active" : ""
+            }`}
+            onClick={() => onSectionChange("chat")}
           >
             AI Chat
-          </button>
+          </Link>
 
-          <button
-            className={
-              activeSection === "dashboard"
-                ? "active"
-                : ""
-            }
-            onClick={() =>
-              onSectionChange("dashboard")
-            }
+          {isAdmin && (
+            <Link
+              href="/policies"
+              className={`nav-link ${
+                activeSection === "policies" ? "active" : ""
+              }`}
+            >
+              Policy Upload
+            </Link>
+          )}
+
+          {isAdmin && (
+            <Link
+              href="/users"
+              className={`nav-link ${
+                activeSection === "users" ? "active" : ""
+              }`}
+            >
+              Users
+            </Link>
+          )}
+
+          <Link
+            href="/hr"
+            className={`nav-link ${
+              activeSection === "hr" ? "active" : ""
+            }`}
+          >
+            HR Candidates
+          </Link>
+
+          <Link
+            href="/?section=dashboard"
+            className={`nav-link ${
+              activeSection === "dashboard" ? "active" : ""
+            }`}
+            onClick={() => onSectionChange("dashboard")}
           >
             Security Dashboard
-          </button>
+          </Link>
 
-          <button
-            className={
-              activeSection === "live-registry"
-                ? "active"
-                : ""
-            }
+          <Link
+            href="/?section=live-registry"
+            className={`nav-link ${
+              activeSection === "live-registry" ? "active" : ""
+            }`}
             onClick={() =>
               onSectionChange("live-registry")
             }
           >
             Live Registry
-          </button>
+          </Link>
 
-          <button
-            className={
-              activeSection === "allowed"
-                ? "active"
-                : ""
-            }
-            onClick={() =>
-              onSectionChange("allowed")
-            }
+          <Link
+            href="/?section=allowed"
+            className={`nav-link ${
+              activeSection === "allowed" ? "active" : ""
+            }`}
+            onClick={() => onSectionChange("allowed")}
           >
             Allowed Logs
-          </button>
+          </Link>
 
-          <button
-            className={
-              activeSection === "blocked"
-                ? "active"
-                : ""
-            }
-            onClick={() =>
-              onSectionChange("blocked")
-            }
+          <Link
+            href="/?section=blocked"
+            className={`nav-link ${
+              activeSection === "blocked" ? "active" : ""
+            }`}
+            onClick={() => onSectionChange("blocked")}
           >
             Blocked Outputs
-          </button>
+          </Link>
 
-          <button
-            className={
-              activeSection === "risk"
-                ? "active"
-                : ""
-            }
-            onClick={() =>
-              onSectionChange("risk")
-            }
+          <Link
+            href="/?section=risk"
+            className={`nav-link ${
+              activeSection === "risk" ? "active" : ""
+            }`}
+            onClick={() => onSectionChange("risk")}
           >
             Risk Analysis
-          </button>
+          </Link>
 
-          <button
-            className={
-              activeSection === "settings"
-                ? "active"
-                : ""
-            }
-            onClick={() =>
-              onSectionChange("settings")
-            }
+          <Link
+            href="/?section=settings"
+            className={`nav-link ${
+              activeSection === "settings" ? "active" : ""
+            }`}
+            onClick={() => onSectionChange("settings")}
           >
             Settings
-          </button>
+          </Link>
         </nav>
       </div>
 
@@ -155,6 +175,23 @@ export default function AppSidebar({
             </p>
           </div>
         </div>
+
+        {username && (
+          <p className="sidebar-user">
+            Signed in as {username}
+            {isAdmin ? " (ADMIN)" : " (EMPLOYEE)"}
+          </p>
+        )}
+
+        {onLogout && (
+          <button
+            type="button"
+            className="sidebar-logout"
+            onClick={onLogout}
+          >
+            Logout
+          </button>
+        )}
 
         <p className="sidebar-version">
           WRDN v2.0

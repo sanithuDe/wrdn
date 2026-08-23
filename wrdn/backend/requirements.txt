@@ -1,11 +1,12 @@
 fastapi
 uvicorn
+uvicorn[standard]
 requests
 pydantic
 google-genai
 python-dotenv
 numpy
 tenacity
-uvicorn[standard]
-
-
+python-multipart
+pypdf
+python-docx

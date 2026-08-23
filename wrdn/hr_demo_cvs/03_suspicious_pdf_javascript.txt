@@ -1,0 +1,9 @@
+H3 inbound-block demo CV.
+
+Visible pages: SAM EDDH (Extra Words) resume.
+Also contains:
+- PDF JavaScript (/JavaScript /JS)
+- Embedded file attachment (/EmbeddedFile)
+
+WRDN should BLOCK this on inbound YARA scan
+before Gemini runs.

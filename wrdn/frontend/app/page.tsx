@@ -1,81 +1,231 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import {
+  useCallback,
+  useEffect,
+  useState,
+} from "react";
 
 import AppSidebar, {
-    type AppSection,
+  type AppSection,
 } from "@/components/AppSidebar";
 
 import ChatInterface from "@/components/ChatInterface";
 import RegistryDashboard from "@/components/RegistryDashboard";
 
+import {
+  clearAuthSession,
+  getAuthUser,
+  type AuthUser,
+} from "@/lib/authApi";
+
+import {
+  displayChatTitle,
+  loadVisibleChatSessions,
+  type ChatSession,
+} from "@/lib/chatHistory";
+
 export default function Home() {
+  const router = useRouter();
+
+  const [user, setUser] = useState<AuthUser | null>(
+    null,
+  );
+  const [checkingAuth, setCheckingAuth] =
+    useState(true);
+
   const [activeSection, setActiveSection] =
     useState<AppSection>("chat");
 
   const [resetSignal, setResetSignal] =
     useState(0);
 
+  const [recentChats, setRecentChats] = useState<
+    ChatSession[]
+  >([]);
+  const [loadChatId, setLoadChatId] = useState<
+    string | null
+  >(null);
+  const [activeChatId, setActiveChatId] = useState<
+    string | null
+  >(null);
+
   const isChat = activeSection === "chat";
+  const isAdmin = user?.role === "ADMIN";
+
+  const handleHistoryChange = useCallback(
+    (sessions: ChatSession[]) => {
+      setRecentChats(sessions);
+    },
+    [],
+  );
+
+  const handleActiveSessionChange = useCallback(
+    (sessionId: string | null) => {
+      setActiveChatId(sessionId);
+    },
+    [],
+  );
 
   function startNewChat() {
-    setResetSignal(
-      (current) => current + 1,
-    );
+    setLoadChatId(null);
+    setActiveChatId(null);
+    setActiveSection("chat");
+    setResetSignal((current) => current + 1);
+  }
+
+  function handleSelectChat(chatId: string) {
+    setActiveSection("chat");
+    setActiveChatId(chatId);
+    if (loadChatId === chatId) {
+      setLoadChatId(null);
+      window.setTimeout(() => {
+        setLoadChatId(chatId);
+      }, 0);
+      return;
+    }
+
+    setLoadChatId(chatId);
+  }
+
+  function handleLogout() {
+    clearAuthSession();
+    router.push("/signin");
   }
 
   useEffect(() => {
-    if (activeSection === "chat") {
+    const currentUser = getAuthUser();
+
+    if (!currentUser) {
+      router.push("/signin");
+      return;
+    }
+
+    setUser(currentUser);
+    setCheckingAuth(false);
+    setRecentChats(
+      loadVisibleChatSessions({
+        username: currentUser.username,
+        role: currentUser.role,
+        clientId: currentUser.client_id,
+      }),
+    );
+  }, [router]);
+
+  useEffect(() => {
+    const section = new URLSearchParams(
+      window.location.search,
+    ).get("section");
+
+    if (!section || section === "chat") {
+      setActiveSection("chat");
+      return;
+    }
+
+    if (
+      section === "dashboard" ||
+      section === "live-registry" ||
+      section === "allowed" ||
+      section === "blocked" ||
+      section === "risk" ||
+      section === "settings"
+    ) {
+      setActiveSection(section);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (
+      activeSection === "chat" ||
+      activeSection === "policies" ||
+      activeSection === "hr" ||
+      activeSection === "users"
+    ) {
       return;
     }
 
     const sectionMap: Record<
-      Exclude<AppSection, "chat">,
+      Exclude<AppSection, "chat" | "policies" | "hr" | "users">,
       string
     > = {
       dashboard: "overview-section",
-      "live-registry":
-        "live-registry-section",
+      "live-registry": "live-registry-section",
       allowed: "allowed-section",
       blocked: "blocked-section",
       risk: "risk-section",
       settings: "settings-section",
     };
 
-    const sectionId =
-      sectionMap[activeSection];
+    const sectionId = sectionMap[activeSection];
 
-    const timeoutId =
-      window.setTimeout(() => {
-        document
-          .getElementById(sectionId)
-          ?.scrollIntoView({
-            behavior: "smooth",
-            block: "start",
-          });
-      }, 100);
+    const timeoutId = window.setTimeout(() => {
+      document
+        .getElementById(sectionId)
+        ?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+    }, 100);
 
-    return () =>
-      window.clearTimeout(timeoutId);
+    return () => window.clearTimeout(timeoutId);
   }, [activeSection]);
+
+  if (checkingAuth || !user) {
+    return (
+      <div className="wrdn-application">
+        <main className="application-content">
+          <p style={{ padding: 24 }}>
+            Loading dashboard...
+          </p>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="wrdn-application">
       <AppSidebar
         activeSection={activeSection}
-        onSectionChange={
-          setActiveSection
-        }
+        onSectionChange={setActiveSection}
         onNewChat={startNewChat}
+        isAdmin={isAdmin}
+        username={user.username}
+        onLogout={handleLogout}
       />
 
-      <main className="application-content">
+      <main
+        className={`application-content${
+          isChat ? " chat-view" : ""
+        }`}
+      >
         {isChat ? (
           <ChatInterface
             resetSignal={resetSignal}
+            loadChatId={loadChatId}
+            onHistoryChange={handleHistoryChange}
+            onActiveSessionChange={
+              handleActiveSessionChange
+            }
+            recentChats={recentChats.map((chat) => ({
+              id: chat.id,
+              title: displayChatTitle(
+                chat,
+                user.username,
+              ),
+              ownerUsername: chat.ownerUsername,
+            }))}
+            activeChatId={activeChatId}
+            onSelectChat={handleSelectChat}
+            onNewChat={startNewChat}
+            isAdmin={isAdmin}
           />
         ) : (
-          <RegistryDashboard />
+          <RegistryDashboard
+            isAdmin={isAdmin}
+            clientId={user.client_id}
+            username={user.username}
+          />
         )}
       </main>
     </div>

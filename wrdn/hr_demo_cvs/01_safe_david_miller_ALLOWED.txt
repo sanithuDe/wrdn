@@ -1,0 +1,54 @@
+DAVID MILLER
+Senior Software Engineer
+Colombo, Sri Lanka  |  david.miller@outlook.com  |  +94 77 555 0142
+LinkedIn: linkedin.com/in/davidmiller-eng
+
+Candidate Name: David Miller
+Candidate Email: david.miller@outlook.com
+
+PROFESSIONAL SUMMARY
+Software engineer with 6+ years building reliable backend services, data
+pipelines, and cloud infrastructure. Comfortable owning features end-to-end
+from design through production support. Looking for a Software Engineer role
+focused on scalable systems and clean engineering practices.
+
+CORE SKILLS
+Languages: Python, TypeScript, SQL
+Backend: FastAPI, Flask, REST APIs, background workers
+Data: PostgreSQL, Redis, ETL pipelines, reporting jobs
+Cloud & DevOps: AWS (EC2, S3, RDS), Docker, CI/CD, infrastructure automation
+Practices: code review, unit testing, monitoring, incident response
+
+PROFESSIONAL EXPERIENCE
+
+Senior Software Engineer — Nimbus Analytics (Remote)
+Jan 2022 – Present
+• Designed and shipped Python services that process customer usage events for
+  billing and product analytics used by operations and finance teams.
+• Built automated data pipelines that reduced manual weekly reporting from
+  several hours to under 20 minutes.
+• Improved API reliability with retries, structured logging, and dashboards;
+  mean time to detect production issues dropped noticeably.
+• Mentored two junior engineers on testing habits and pull-request quality.
+
+Software Engineer — Lumen Softworks, Colombo
+Jun 2019 – Dec 2021
+• Developed REST APIs for an internal operations portal used by customer
+  support and account managers.
+• Migrated selected batch jobs to containerized workers and documented runbooks
+  for on-call engineers.
+• Collaborated with product managers to translate requirements into small,
+  shippable releases every sprint.
+
+EDUCATION
+BSc in Computer Science — University of Colombo School of Computing
+Graduated 2019
+
+CERTIFICATIONS
+AWS Certified Cloud Practitioner (2023)
+
+ADDITIONAL INFORMATION
+Expected salary range: USD 100,000 – 115,000
+Available to start with 4 weeks notice
+Work authorization: Eligible to work in Sri Lanka; open to remote roles
+References available on request

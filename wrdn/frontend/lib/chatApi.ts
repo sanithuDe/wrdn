@@ -1,6 +1,6 @@
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ||
-  "http://127.0.0.1:8000";
+  "http://localhost:18000";
 
 export interface ChatApiResponse {
   user_prompt?: string;
@@ -12,12 +12,27 @@ export interface ChatApiResponse {
   risk_score?: number;
   detection_layer?: string;
   detection_reason?: string;
+  client_id?: string;
+  policy_id?: number;
+  policy_version?: number;
+  protection_enabled?: boolean;
   status?: string;
   error?: string;
+  detection_log?: Array<{
+    step: number;
+    name: string;
+    status: string;
+    detected?: boolean;
+    skipped?: boolean;
+    risk_score: number;
+    detail: string;
+  }>;
 }
 
 export async function sendChatMessage(
   userPrompt: string,
+  clientId: string,
+  username = "",
 ): Promise<ChatApiResponse> {
   let response: Response;
 
@@ -29,11 +44,13 @@ export async function sendChatMessage(
       },
       body: JSON.stringify({
         prompt: userPrompt,
+        client_id: clientId,
+        username,
       }),
     });
-  } catch (error) {
+  } catch {
     throw new Error(
-      `Cannot connect to WRDN backend at ${API_URL}. Confirm that FastAPI is running on port 8000.`,
+      `Cannot connect to WRDN backend at ${API_URL}. Confirm that FastAPI is running.`,
     );
   }
 

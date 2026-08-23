@@ -1,0 +1,159 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+2 0 obj
+<< /Length 2357 >>
+stream
+BT
+/F1 10 Tf
+50 762 Td
+14 TL
+(DAVID MILLER) Tj
+T*
+(Senior Software Engineer) Tj
+T*
+(Colombo, Sri Lanka  |  david.miller@outlook.com  |  +94 77 555 0142) Tj
+T*
+(LinkedIn: linkedin.com/in/davidmiller-eng) Tj
+T*
+() Tj
+T*
+(Candidate Name: David Miller) Tj
+T*
+(Candidate Email: david.miller@outlook.com) Tj
+T*
+() Tj
+T*
+(PROFESSIONAL SUMMARY) Tj
+T*
+(Software engineer with 6+ years building reliable backend services, data) Tj
+T*
+(pipelines, and cloud infrastructure. Comfortable owning features end-to-end) Tj
+T*
+(from design through production support. Looking for a Software Engineer role) Tj
+T*
+(focused on scalable systems and clean engineering practices.) Tj
+T*
+() Tj
+T*
+(CORE SKILLS) Tj
+T*
+(Languages: Python, TypeScript, SQL) Tj
+T*
+(Backend: FastAPI, Flask, REST APIs, background workers) Tj
+T*
+(Data: PostgreSQL, Redis, ETL pipelines, reporting jobs) Tj
+T*
+(Cloud & DevOps: AWS \(EC2, S3, RDS\), Docker, CI/CD, infrastructure automation) Tj
+T*
+(Practices: code review, unit testing, monitoring, incident response) Tj
+T*
+() Tj
+T*
+(PROFESSIONAL EXPERIENCE) Tj
+T*
+() Tj
+T*
+(Senior Software Engineer ? Nimbus Analytics \(Remote\)) Tj
+T*
+(Jan 2022 ? Present) Tj
+T*
+(? Designed and shipped Python services that process customer usage events for) Tj
+T*
+(  billing and product analytics used by operations and finance teams.) Tj
+T*
+(? Built automated data pipelines that reduced manual weekly reporting from) Tj
+T*
+(  several hours to under 20 minutes.) Tj
+T*
+(? Improved API reliability with retries, structured logging, and dashboards;) Tj
+T*
+(  mean time to detect production issues dropped noticeably.) Tj
+T*
+(? Mentored two junior engineers on testing habits and pull-request quality.) Tj
+T*
+() Tj
+T*
+(Software Engineer ? Lumen Softworks, Colombo) Tj
+T*
+(Jun 2019 ? Dec 2021) Tj
+T*
+(? Developed REST APIs for an internal operations portal used by customer) Tj
+T*
+(  support and account managers.) Tj
+T*
+(? Migrated selected batch jobs to containerized workers and documented runbooks) Tj
+T*
+(  for on-call engineers.) Tj
+T*
+(? Collaborated with product managers to translate requirements into small,) Tj
+T*
+(  shippable releases every sprint.) Tj
+T*
+() Tj
+T*
+(EDUCATION) Tj
+T*
+(BSc in Computer Science ? University of Colombo School of Computing) Tj
+T*
+(Graduated 2019) Tj
+T*
+() Tj
+T*
+(CERTIFICATIONS) Tj
+T*
+(AWS Certified Cloud Practitioner \(2023\)) Tj
+ET
+endstream
+endobj
+3 0 obj
+<< /Type /Page /Parent 6 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 1 0 R >> >> /Contents 2 0 R >>
+endobj
+4 0 obj
+<< /Length 297 >>
+stream
+BT
+/F1 10 Tf
+50 762 Td
+14 TL
+() Tj
+T*
+(ADDITIONAL INFORMATION) Tj
+T*
+(Expected salary range: USD 100,000 ? 115,000) Tj
+T*
+(Available to start with 4 weeks notice) Tj
+T*
+(Work authorization: Eligible to work in Sri Lanka; open to remote roles) Tj
+T*
+(References available on request) Tj
+T*
+() Tj
+ET
+endstream
+endobj
+5 0 obj
+<< /Type /Page /Parent 6 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 1 0 R >> >> /Contents 4 0 R >>
+endobj
+6 0 obj
+<< /Type /Pages /Kids [3 0 R 5 0 R] /Count 2 >>
+endobj
+7 0 obj
+<< /Type /Catalog /Pages 6 0 R >>
+endobj
+xref
+0 8
+0000000000 65535 f 
+0000000009 00000 n 
+0000000079 00000 n 
+0000002488 00000 n 
+0000002614 00000 n 
+0000002962 00000 n 
+0000003088 00000 n 
+0000003151 00000 n 
+trailer
+<< /Size 8 /Root 7 0 R >>
+startxref
+3200
+%%EOF

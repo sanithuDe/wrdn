@@ -4,7 +4,7 @@ import {
     useRegistryData,
     type RegistryLog,
 } from "@/hooks/useRegistryData";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
     Area,
@@ -19,6 +19,15 @@ import {
 } from "recharts";
 
 type TimeFilter = "1h" | "24h" | "7d" | "all";
+
+const TIME_FILTERS: TimeFilter[] = ["1h", "24h", "7d", "all"];
+
+/** Survives section navigation; resets to "all" on full page refresh. */
+let persistedTimeFilter: TimeFilter = "all";
+
+function isTimeFilter(value: string): value is TimeFilter {
+  return TIME_FILTERS.includes(value as TimeFilter);
+}
 
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ||
@@ -97,7 +106,15 @@ function getBucketKey(date: Date, filter: TimeFilter): string {
   });
 }
 
-export default function RegistryDashboard() {
+export default function RegistryDashboard({
+  isAdmin = false,
+  clientId = "clientA",
+  username = "",
+}: {
+  isAdmin?: boolean;
+  clientId?: string;
+  username?: string;
+}) {
   const {
     registryData,
     loading,
@@ -106,8 +123,100 @@ export default function RegistryDashboard() {
     refresh,
   } = useRegistryData();
 
-  const [timeFilter, setTimeFilter] =
-    useState<TimeFilter>("all");
+  const [timeFilter, setTimeFilter] = useState<TimeFilter>(
+    persistedTimeFilter,
+  );
+  const [protectionEnabled, setProtectionEnabled] =
+    useState(true);
+  const [protectionBusy, setProtectionBusy] =
+    useState(false);
+  const [protectionMessage, setProtectionMessage] =
+    useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void fetch(
+      `${API_URL}/api/protection-status?client_id=${encodeURIComponent(
+        clientId,
+      )}`,
+    )
+      .then(async (response) => {
+        const data = await response.json();
+        if (!cancelled && response.ok) {
+          setProtectionEnabled(
+            Boolean(data.protection_enabled),
+          );
+          setProtectionMessage(
+            String(data.message || ""),
+          );
+        }
+      })
+      .catch(() => {
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [clientId]);
+
+  async function toggleProtection() {
+    if (!isAdmin || protectionBusy) {
+      return;
+    }
+
+    setProtectionBusy(true);
+    setProtectionMessage("");
+
+    try {
+      const response = await fetch(
+        `${API_URL}/api/admin/protection-status`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            client_id: clientId,
+            enabled: !protectionEnabled,
+          }),
+        },
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data?.detail ||
+            "Could not update protection status.",
+        );
+      }
+
+      setProtectionEnabled(
+        Boolean(data.protection_enabled),
+      );
+      setProtectionMessage(
+        String(data.message || ""),
+      );
+    } catch (toggleError) {
+      setProtectionMessage(
+        toggleError instanceof Error
+          ? toggleError.message
+          : "Could not update protection status.",
+      );
+    } finally {
+      setProtectionBusy(false);
+    }
+  }
+
+  function handleTimeFilterChange(value: string) {
+    if (!isTimeFilter(value)) {
+      return;
+    }
+
+    persistedTimeFilter = value;
+    setTimeFilter(value);
+  }
 
   function scrollToSection(sectionId: string) {
     document.getElementById(sectionId)?.scrollIntoView({
@@ -136,8 +245,8 @@ export default function RegistryDashboard() {
       .filter((log) => log.parsedDate !== null)
       .sort(
         (first, second) =>
-          first.parsedDate!.getTime() -
-          second.parsedDate!.getTime(),
+          second.parsedDate!.getTime() -
+          first.parsedDate!.getTime(),
       );
 
     if (allLogs.length === 0) {
@@ -343,22 +452,26 @@ export default function RegistryDashboard() {
             <h1>Live Governance Registry</h1>
 
             <p>
-              Local SQLite audit-log monitoring dashboard
+              {isAdmin
+                ? `Admin scope: all chat/shield activity for client ${clientId}${
+                    username ? ` (signed in as ${username})` : ""
+                  }.`
+                : `Employee scope: only your own shield activity${
+                    username ? ` (${username})` : ""
+                  } on client ${clientId}.`}
             </p>
           </div>
 
           <div className="topbar-right">
             <span className="live-status">
-              Database Connected
+              Registry Live
             </span>
 
             <select
               className="filter-select"
               value={timeFilter}
               onChange={(event) =>
-                setTimeFilter(
-                  event.target.value as TimeFilter,
-                )
+                handleTimeFilterChange(event.target.value)
               }
             >
               <option value="1h">Last 1 hour</option>
@@ -378,20 +491,21 @@ export default function RegistryDashboard() {
           className="cards-grid section-offset"
         >
           <div className="card">
-            <p>Database</p>
+            <p>Workspace</p>
 
-            <h2>
-              {registryData.database_type || "SQLite"}
-            </h2>
+            <h2>{clientId || "—"}</h2>
 
-            <span>Local project database</span>
+            <span>Active client workspace</span>
           </div>
 
           <div className="card">
-            <p>Database Status</p>
+            <p>System status</p>
 
             <h2 className="secure-text">
-              {registryData.database_status}
+              {String(registryData.database_status || "")
+                .toUpperCase() === "ERROR"
+                ? "Check required"
+                : "Online"}
             </h2>
 
             <span>Live registry active</span>
@@ -578,6 +692,7 @@ export default function RegistryDashboard() {
               <thead>
                 <tr>
                   <th>Timestamp</th>
+                  <th>User</th>
                   <th>User Prompt</th>
                   <th>AI Output</th>
                   <th>Status</th>
@@ -589,7 +704,7 @@ export default function RegistryDashboard() {
                 {calculatedData.filteredAllowed.length ===
                 0 ? (
                   <tr>
-                    <td colSpan={5}>
+                    <td colSpan={6}>
                       No allowed logs found for this time
                       range.
                     </td>
@@ -602,6 +717,10 @@ export default function RegistryDashboard() {
                           {formatDateTime(log.timestamp)}
                         </td>
 
+                        <td>
+                          {log.username || "—"}
+                        </td>
+
                         <td className="long-text">
                           {log.user_prompt}
                         </td>
@@ -612,7 +731,9 @@ export default function RegistryDashboard() {
 
                         <td>
                           <span className="allowed-badge">
-                            {log.shield_status}
+                            {String(
+                              log.shield_status || "ALLOWED",
+                            ).toUpperCase()}
                           </span>
                         </td>
 
@@ -643,6 +764,7 @@ export default function RegistryDashboard() {
               <thead>
                 <tr>
                   <th>Timestamp</th>
+                  <th>User</th>
                   <th>User Prompt</th>
                   <th>Status</th>
                   <th>Risk Score</th>
@@ -654,7 +776,7 @@ export default function RegistryDashboard() {
                 {calculatedData.filteredBlocked.length ===
                 0 ? (
                   <tr>
-                    <td colSpan={5}>
+                    <td colSpan={6}>
                       No blocked logs found for this time
                       range.
                     </td>
@@ -667,13 +789,26 @@ export default function RegistryDashboard() {
                           {formatDateTime(log.timestamp)}
                         </td>
 
+                        <td>
+                          {log.username || "—"}
+                        </td>
+
                         <td className="long-text">
                           {log.user_prompt}
                         </td>
 
                         <td>
-                          <span className="risk-badge">
-                            {log.shield_status}
+                          <span
+                            className={
+                              String(log.shield_status)
+                                .toUpperCase() === "ALLOWED"
+                                ? "allowed-badge"
+                                : "risk-badge"
+                            }
+                          >
+                            {String(
+                              log.shield_status || "UNKNOWN",
+                            ).toUpperCase()}
                           </span>
                         </td>
 
@@ -729,17 +864,27 @@ export default function RegistryDashboard() {
 
               <h2>{registryData.audit_count ?? 0}</h2>
 
-              <span>Stored in local SQLite</span>
+              <span>Governance event history</span>
             </div>
 
             <div className="card">
               <p>Protection</p>
 
-              <h2 className="secure-text">
-                ACTIVE
+              <h2
+                className={
+                  protectionEnabled
+                    ? "secure-text"
+                    : "danger-text"
+                }
+              >
+                {protectionEnabled ? "ACTIVE" : "DISABLED"}
               </h2>
 
-              <span>Gemini output monitoring</span>
+              <span>
+                {protectionEnabled
+                  ? "Gemini output monitoring"
+                  : "Shield bypassed for demo"}
+              </span>
             </div>
           </div>
         </section>
@@ -752,40 +897,63 @@ export default function RegistryDashboard() {
             <h3>Settings</h3>
 
             <p>
-              Current frontend, backend and database
-              connection information.
+              Non-sensitive workspace preferences and WRDN
+              protection controls.
             </p>
           </div>
 
           <div className="settings-grid">
-            <div className="setting-row">
-              <span>Backend API</span>
+            <div className="setting-row protection-setting-row">
+              <div>
+                <span>WRDN Protection</span>
+                <p className="protection-setting-help">
+                  {protectionEnabled
+                    ? "Enabled: shield blocks unsafe AI output (normal secure mode)."
+                    : "Disabled: raw AI output is shown (BYPASSED) for demo comparison."}
+                </p>
+                {protectionMessage ? (
+                  <p className="protection-setting-message">
+                    {protectionMessage}
+                  </p>
+                ) : null}
+              </div>
 
-              <strong>{API_URL}</strong>
+              {isAdmin ? (
+                <button
+                  type="button"
+                  className={`protection-toggle-button ${
+                    protectionEnabled
+                      ? "enabled"
+                      : "disabled"
+                  }`}
+                  disabled={protectionBusy}
+                  onClick={() => void toggleProtection()}
+                >
+                  {protectionBusy
+                    ? "Updating..."
+                    : protectionEnabled
+                      ? "Disable Protection"
+                      : "Enable Protection"}
+                </button>
+              ) : (
+                <strong>
+                  {protectionEnabled
+                    ? "ENABLED"
+                    : "DISABLED"}
+                </strong>
+              )}
             </div>
 
             <div className="setting-row">
-              <span>Registry Endpoint</span>
-
-              <strong>{API_URL}/api/registry</strong>
+              <span>Signed-in role</span>
+              <strong>
+                {isAdmin ? "ADMIN" : "EMPLOYEE"}
+              </strong>
             </div>
 
             <div className="setting-row">
-              <span>Database</span>
-
-              <strong>Local SQLite</strong>
-            </div>
-
-            <div className="setting-row">
-              <span>Refresh Interval</span>
-
-              <strong>3 seconds</strong>
-            </div>
-
-            <div className="setting-row">
-              <span>Selected Time Range</span>
-
-              <strong>{timeFilter}</strong>
+              <span>Application</span>
+              <strong>WRDN Enterprise Prompt Shield</strong>
             </div>
           </div>
         </section>
