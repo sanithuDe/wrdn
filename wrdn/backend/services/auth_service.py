@@ -328,6 +328,36 @@ def resolve_organisation_client(
     return client_id, raw
 
 
+def _default_workspace_client() -> tuple[str, str]:
+    """
+    Single internal workspace already used by existing users.
+    """
+
+    connection = get_connection()
+    try:
+        row = connection.execute(
+            """
+            SELECT
+                u.ClientID AS client_id,
+                COALESCE(c.ClientName, u.ClientID) AS client_name
+            FROM Users u
+            LEFT JOIN Clients c
+                ON c.ClientID = u.ClientID
+            ORDER BY
+                CASE WHEN UPPER(u.Role) = 'ADMIN' THEN 0 ELSE 1 END,
+                u.UserID ASC
+            LIMIT 1
+            """
+        ).fetchone()
+
+        if row is None:
+            return "clientA", "Client A"
+
+        return str(row["client_id"]), str(row["client_name"])
+    finally:
+        connection.close()
+
+
 def public_signup_is_empty() -> bool:
     return count_all_users() == 0
 
@@ -344,9 +374,8 @@ def register_user(
     Public signup.
 
     First user in an empty database may become ADMIN.
-    After that, public signup is always EMPLOYEE.
-    Requested role from the client is ignored except
-    for that first-user bootstrap.
+    After that, public signup is always EMPLOYEE and
+    joins the one internal workspace (no org matching).
     """
 
     cleaned_username = username.strip()
@@ -380,6 +409,9 @@ def register_user(
 
     if count_all_users() == 0:
         normalized_role = "ADMIN"
+        client_id, client_name = resolve_organisation_client(
+            organisation
+        )
     else:
         requested = (role or "EMPLOYEE").strip().upper()
         if requested == "ADMIN":
@@ -387,10 +419,9 @@ def register_user(
                 "Admin accounts can only be created by an existing admin."
             )
         normalized_role = "EMPLOYEE"
+        # One internal company only — join that workspace.
+        client_id, client_name = _default_workspace_client()
 
-    client_id, client_name = resolve_organisation_client(
-        organisation
-    )
     ensure_client_exists(client_id, client_name)
 
     user_id = create_user(
