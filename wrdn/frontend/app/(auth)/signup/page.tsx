@@ -176,7 +176,7 @@ export default function SignUpPage() {
             <p>
               {firstAdmin
                 ? "No accounts exist yet. This first signup becomes the Admin. Later signups are Employee only."
-                : "Public signup creates an Employee account. Admin accounts are created only by an existing Admin."}
+                : "Public signup creates an Employee account in the same company workspace. Admin accounts are created only by an existing Admin."}
               {" "}
               Then open Sign in and type the same username
               and password again.
