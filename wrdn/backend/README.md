@@ -173,7 +173,7 @@ Inbound scan tests:
 python wrdn/backend/tests/test_inbound_scan.py
 ```
 
-Brevo delivery uses `POLICY_APPROVAL_EMAIL` as the demo inbox. The intended candidate address is kept in the message body.
+Brevo delivery uses the **email found on the CV**. If the CV has no address, it falls back to `POLICY_APPROVAL_EMAIL`.
 
 ---
 

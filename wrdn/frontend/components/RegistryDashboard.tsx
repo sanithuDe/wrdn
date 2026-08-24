@@ -257,6 +257,11 @@ export default function RegistryDashboard({
         riskChartData: [],
         highestRiskScore: 0,
         averageRiskScore: 0,
+        totalEvents: 0,
+        blockRate: 0,
+        criticalCount: 0,
+        topReasons: [] as { reason: string; count: number }[],
+        latestBlocked: [] as typeof allLogs,
       };
     }
 
@@ -362,6 +367,38 @@ export default function RegistryDashboard({
           )
         : 0;
 
+    const totalEvents = filteredLogs.length;
+    const blockRate =
+      totalEvents > 0
+        ? Math.round((filteredBlocked.length / totalEvents) * 100)
+        : 0;
+    const criticalCount = filteredLogs.filter(
+      (log) => Number(log.risk_score || 0) >= 90,
+    ).length;
+
+    const reasonCounts = new Map<string, number>();
+    filteredBlocked.forEach((log) => {
+      const reason = String(log.detection_reason || "")
+        .replace(/\s+/g, " ")
+        .trim();
+      const lower = reason.toLowerCase();
+
+      if (
+        !reason ||
+        lower.includes("no high semantic") ||
+        lower.includes("passed all")
+      ) {
+        return;
+      }
+
+      reasonCounts.set(reason, (reasonCounts.get(reason) || 0) + 1);
+    });
+
+    const topReasons = Array.from(reasonCounts.entries())
+      .map(([reason, count]) => ({ reason, count }))
+      .sort((first, second) => second.count - first.count)
+      .slice(0, 3);
+
     return {
       filteredAllowed,
       filteredBlocked,
@@ -369,6 +406,11 @@ export default function RegistryDashboard({
       riskChartData,
       highestRiskScore,
       averageRiskScore,
+      totalEvents,
+      blockRate,
+      criticalCount,
+      topReasons,
+      latestBlocked: filteredBlocked.slice(0, 3),
     };
   }, [registryData, timeFilter]);
 
@@ -491,46 +533,59 @@ export default function RegistryDashboard({
           className="cards-grid section-offset"
         >
           <div className="card">
-            <p>Workspace</p>
-
-            <h2>{clientId || "—"}</h2>
-
-            <span>Active client workspace</span>
-          </div>
-
-          <div className="card">
-            <p>System status</p>
-
-            <h2 className="secure-text">
-              {String(registryData.database_status || "")
-                .toUpperCase() === "ERROR"
-                ? "Check required"
-                : "Online"}
-            </h2>
-
-            <span>Live registry active</span>
-          </div>
-
-          <div className="card">
-            <p>Allowed Logs</p>
+            <p>Allowed</p>
 
             <h2 className="secure-text">
               {calculatedData.filteredAllowed.length}
             </h2>
 
-            <span>Safe AI responses</span>
+            <span>Passed WRDN checks</span>
           </div>
 
           <div className="card">
-            <p>Blocked Logs</p>
+            <p>Blocked</p>
 
             <h2 className="danger-text">
               {calculatedData.filteredBlocked.length}
             </h2>
 
-            <span>Restricted AI responses</span>
+            <span>Stopped by WRDN</span>
+          </div>
+
+          <div className="card">
+            <p>Block rate</p>
+
+            <h2>
+              {calculatedData.blockRate}%
+            </h2>
+
+            <span>
+              {calculatedData.totalEvents} events in this window
+            </span>
+          </div>
+
+          <div className="card">
+            <p>Highest risk</p>
+
+            <h2 className="danger-text">
+              {calculatedData.highestRiskScore}
+            </h2>
+
+            <span>
+              {calculatedData.criticalCount} event
+              {calculatedData.criticalCount === 1 ? "" : "s"} scored 90+
+            </span>
           </div>
         </section>
+
+        <p className="registry-insight">
+          WRDN allowed{" "}
+          <strong>{calculatedData.filteredAllowed.length}</strong>{" "}
+          and blocked{" "}
+          <strong>{calculatedData.filteredBlocked.length}</strong>{" "}
+          ({calculatedData.blockRate}% blocked). Highest risk score is{" "}
+          <strong>{calculatedData.highestRiskScore}/100</strong>.
+        </p>
 
         <p className="last-updated">
           Last updated:{" "}
@@ -834,42 +889,82 @@ export default function RegistryDashboard({
             <h3>Risk Analysis</h3>
 
             <p>
-              Security summary for the selected period.
+              Simple view of how much was allowed, how much was
+              blocked, and why.
             </p>
+          </div>
+
+          <p className="registry-insight">
+            {calculatedData.totalEvents === 0
+              ? "No shield events in this time range."
+              : `Of ${calculatedData.totalEvents} events, ${calculatedData.filteredAllowed.length} were allowed and ${calculatedData.filteredBlocked.length} were blocked (${calculatedData.blockRate}%). Average risk ${calculatedData.averageRiskScore}/100. Highest ${calculatedData.highestRiskScore}/100.`}
+          </p>
+
+          <div
+            className="risk-split"
+            aria-label="Allowed versus blocked"
+          >
+            <div className="risk-split-bar">
+              <span
+                className="allowed"
+                style={{
+                  width: `${
+                    calculatedData.totalEvents > 0
+                      ? (calculatedData.filteredAllowed.length /
+                          calculatedData.totalEvents) *
+                        100
+                      : 50
+                  }%`,
+                }}
+              />
+              <span
+                className="blocked"
+                style={{
+                  width: `${
+                    calculatedData.totalEvents > 0
+                      ? (calculatedData.filteredBlocked.length /
+                          calculatedData.totalEvents) *
+                        100
+                      : 50
+                  }%`,
+                }}
+              />
+            </div>
+            <div className="risk-split-legend">
+              <span className="secure-text">
+                Allowed {calculatedData.filteredAllowed.length}
+              </span>
+              <span className="danger-text">
+                Blocked {calculatedData.filteredBlocked.length}
+              </span>
+            </div>
           </div>
 
           <div className="cards-grid">
             <div className="card">
-              <p>Highest Risk</p>
-
+              <p>Highest risk</p>
               <h2 className="danger-text">
                 {calculatedData.highestRiskScore}
               </h2>
-
-              <span>Maximum detected score</span>
+              <span>Worst score in this window</span>
             </div>
 
             <div className="card">
-              <p>Average Risk</p>
+              <p>Average risk</p>
+              <h2>{calculatedData.averageRiskScore}</h2>
+              <span>Mean across all events</span>
+            </div>
 
-              <h2>
-                {calculatedData.averageRiskScore}
+            <div className="card">
+              <p>Critical (90+)</p>
+              <h2 className="danger-text">
+                {calculatedData.criticalCount}
               </h2>
-
-              <span>Average across filtered logs</span>
-            </div>
-
-            <div className="card">
-              <p>Total Audit Logs</p>
-
-              <h2>{registryData.audit_count ?? 0}</h2>
-
-              <span>Governance event history</span>
+              <span>Events that need attention first</span>
             </div>
 
             <div className="card">
               <p>Protection</p>
-
               <h2
                 className={
                   protectionEnabled
@@ -877,14 +972,73 @@ export default function RegistryDashboard({
                     : "danger-text"
                 }
               >
-                {protectionEnabled ? "ACTIVE" : "DISABLED"}
+                {protectionEnabled ? "ON" : "OFF"}
               </h2>
-
               <span>
                 {protectionEnabled
-                  ? "Gemini output monitoring"
-                  : "Shield bypassed for demo"}
+                  ? "Shield is checking output"
+                  : "Shield is bypassed"}
               </span>
+            </div>
+          </div>
+
+          <div className="risk-simple-grid">
+            <div className="risk-simple-box">
+              <h4>Why it was blocked</h4>
+              <p>Most common reasons in this window.</p>
+
+              {calculatedData.topReasons.length === 0 ? (
+                <p className="empty-hint">No blocks to explain.</p>
+              ) : (
+                <ol className="risk-reason-list">
+                  {calculatedData.topReasons.map((item) => (
+                    <li key={item.reason}>
+                      <span>
+                        {item.reason.length > 140
+                          ? `${item.reason.slice(0, 140).trim()}…`
+                          : item.reason}
+                      </span>
+                      <strong>{item.count}</strong>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </div>
+
+            <div className="risk-simple-box">
+              <h4>Latest blocks</h4>
+              <p>Newest blocked events. Full list is under Blocked Outputs.</p>
+
+              {calculatedData.latestBlocked.length === 0 ? (
+                <p className="empty-hint">No blocked events in this window.</p>
+              ) : (
+                <ul className="risk-latest-list">
+                  {calculatedData.latestBlocked.map((log) => (
+                    <li key={log.id}>
+                      <div>
+                        <span className="risk-badge">
+                          {String(log.shield_status || "BLOCKED").toUpperCase()}
+                        </span>
+                        <em>{log.risk_score}/100</em>
+                      </div>
+                      <p>
+                        {String(log.detection_reason || log.user_prompt || "—")
+                          .replace(/\s+/g, " ")
+                          .trim()
+                          .slice(0, 160)}
+                        {String(log.detection_reason || log.user_prompt || "")
+                          .length > 160
+                          ? "…"
+                          : ""}
+                      </p>
+                      <small>
+                        {formatDateTime(log.timestamp)}
+                        {log.username ? ` · ${log.username}` : ""}
+                      </small>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           </div>
         </section>
