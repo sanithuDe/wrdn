@@ -18,6 +18,24 @@ export interface ChatApiResponse {
   protection_enabled?: boolean;
   status?: string;
   error?: string;
+  consistency_check?: {
+    enabled: boolean;
+    consistency_score?: number | null;
+    relevance_score?: number | null;
+    contradiction_detected?: boolean;
+    decision?: string | null;
+    reason?: string;
+    input?: string;
+    output?: string;
+    error?: string;
+  };
+  relevance_check?: {
+    enabled: boolean;
+    aligned: boolean | null;
+    score: number | null;
+    reason: string;
+    error?: string;
+  };
   detection_log?: Array<{
     step: number;
     name: string;

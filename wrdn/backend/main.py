@@ -58,11 +58,20 @@ from wrdn.backend.services.payload_analyzer import (
 from wrdn.backend.services.policy_loader import (
     get_active_policy,
 )
+from wrdn.backend.services.input_output_consistency import (
+    check_input_output_consistency,
+    public_consistency_payload,
+)
 
 from wrdn.config import (
+    CONSISTENCY_ALLOW_THRESHOLD,
+    CONSISTENCY_CHECK_ENABLED,
+    CONSISTENCY_EMBEDDING_WEIGHT,
+    CONSISTENCY_REVIEW_THRESHOLD,
     GEMINI_API_KEY,
     GEMINI_EMBED_MODEL,
     GEMINI_MODEL,
+    RELEVANCE_THRESHOLD,
 )
 
 
@@ -2106,6 +2115,7 @@ def get_registry(
                 "ALLOWED",
                 "BYPASSED",
                 "UNPROTECTED",
+                "REVIEW",
             }:
                 allowed_logs.append(
                     log_record
@@ -2720,8 +2730,120 @@ def chat(
             blocked_categories=blocked_categories,
         )
 
+        # Input-output consistency: policy-safe answers can still be off-topic.
+        consistency_check: dict[str, Any] = {
+            "enabled": CONSISTENCY_CHECK_ENABLED,
+            "decision": None,
+            "consistency_score": None,
+            "relevance_score": None,
+            "contradiction_detected": False,
+            "reason": "Not evaluated because an earlier layer blocked it.",
+        }
+        if (
+            CONSISTENCY_CHECK_ENABLED
+            and shield.get("status") == "ALLOWED"
+        ):
+            try:
+                consistency_result = (
+                    check_input_output_consistency(
+                        user_prompt=user_prompt,
+                        answer=str(
+                            shield.get(
+                                "final_output",
+                                raw_ai_output,
+                            )
+                        ),
+                        get_embedding=create_gemini_embedding,
+                        client=GEMINI_CLIENT,
+                        model=GEMINI_MODEL,
+                        allow_threshold=(
+                            CONSISTENCY_ALLOW_THRESHOLD
+                        ),
+                        review_threshold=(
+                            CONSISTENCY_REVIEW_THRESHOLD
+                        ),
+                        embedding_weight=(
+                            CONSISTENCY_EMBEDDING_WEIGHT
+                        ),
+                        relevance_threshold=(
+                            RELEVANCE_THRESHOLD
+                        ),
+                    )
+                )
+                consistency_check = {
+                    "enabled": True,
+                    **public_consistency_payload(
+                        consistency_result
+                    ),
+                    "input": user_prompt,
+                    "output": consistency_result.get(
+                        "output",
+                        "",
+                    ),
+                }
+                decision = str(
+                    consistency_result.get("decision")
+                    or "ALLOW"
+                ).upper()
+                score = int(
+                    consistency_result.get(
+                        "consistency_score",
+                        0,
+                    )
+                )
+                if decision == "BLOCK":
+                    shield = {
+                        "allowed": False,
+                        "status": "BLOCKED",
+                        "risk_score": max(0, 100 - score),
+                        "layer": (
+                            "Input-Output Consistency"
+                        ),
+                        "reason": consistency_result[
+                            "reason"
+                        ],
+                        "final_output": (
+                            "This answer was blocked because it "
+                            "did not stay consistent with your "
+                            "question. Please try again."
+                        ),
+                    }
+                elif decision == "REVIEW":
+                    shield = {
+                        "allowed": True,
+                        "status": "REVIEW",
+                        "risk_score": max(0, 100 - score),
+                        "layer": (
+                            "Input-Output Consistency"
+                        ),
+                        "reason": consistency_result[
+                            "reason"
+                        ],
+                        "final_output": str(
+                            shield.get(
+                                "final_output",
+                                raw_ai_output,
+                            )
+                        ),
+                    }
+            except Exception as consistency_error:
+                logger.warning(
+                    "Input-output consistency check failed; "
+                    "keeping the output from earlier WRDN "
+                    "layers: %s",
+                    consistency_error,
+                )
+                consistency_check.update({
+                    "decision": None,
+                    "reason": (
+                        "Consistency service unavailable; "
+                        "check skipped."
+                    ),
+                    "error": str(consistency_error),
+                })
+
         # Keep raw_ai_output in sync when a DB value was filled in.
-        if shield.get("status") == "ALLOWED":
+        if shield.get("status") in {"ALLOWED", "REVIEW"}:
             raw_ai_output = str(
                 shield.get(
                     "final_output",
@@ -2768,7 +2890,7 @@ def chat(
             "raw_ai_output": (
                 raw_ai_output
                 if shield["status"]
-                == "ALLOWED"
+                in {"ALLOWED", "REVIEW"}
                 else (
                     "[HIDDEN BY WRDN]"
                 )
@@ -2800,6 +2922,21 @@ def chat(
                 1,
             ),
             "protection_enabled": True,
+            "consistency_check": consistency_check,
+            "relevance_check": {
+                "enabled": CONSISTENCY_CHECK_ENABLED,
+                "aligned": (
+                    consistency_check.get("decision")
+                    == "ALLOW"
+                ),
+                "score": consistency_check.get(
+                    "relevance_score"
+                ),
+                "reason": consistency_check.get(
+                    "reason",
+                    "",
+                ),
+            },
             "detection_log": build_detection_log(
                 payload=inbound,
                 leak={

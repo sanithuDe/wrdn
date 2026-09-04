@@ -29,6 +29,39 @@ GEMINI_EMBED_MODEL = os.getenv(
     "gemini-embedding-001",
 ).strip()
 
+RELEVANCE_CHECK_ENABLED = os.getenv(
+    "RELEVANCE_CHECK_ENABLED",
+    "true",
+).strip().lower() in {"1", "true", "yes", "on"}
+
+RELEVANCE_THRESHOLD = max(
+    0,
+    min(100, int(os.getenv("RELEVANCE_THRESHOLD", "65"))),
+)
+
+CONSISTENCY_CHECK_ENABLED = os.getenv(
+    "CONSISTENCY_CHECK_ENABLED",
+    "true" if RELEVANCE_CHECK_ENABLED else "false",
+).strip().lower() in {"1", "true", "yes", "on"}
+
+CONSISTENCY_ALLOW_THRESHOLD = max(
+    0,
+    min(100, int(os.getenv("CONSISTENCY_ALLOW_THRESHOLD", "70"))),
+)
+
+CONSISTENCY_REVIEW_THRESHOLD = max(
+    0,
+    min(
+        CONSISTENCY_ALLOW_THRESHOLD,
+        int(os.getenv("CONSISTENCY_REVIEW_THRESHOLD", "45")),
+    ),
+)
+
+CONSISTENCY_EMBEDDING_WEIGHT = max(
+    0.0,
+    min(0.8, float(os.getenv("CONSISTENCY_EMBEDDING_WEIGHT", "0.4"))),
+)
+
 
 # EMAIL CONFIGURATION
 

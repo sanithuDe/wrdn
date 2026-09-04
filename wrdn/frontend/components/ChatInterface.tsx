@@ -439,6 +439,12 @@ export default function ChatInterface({
     }
 
     if (
+      normalized === "REVIEW"
+    ) {
+      return "sanitized";
+    }
+
+    if (
       normalized === "BYPASSED" ||
       normalized === "UNPROTECTED"
     ) {
